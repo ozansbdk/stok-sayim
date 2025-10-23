@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Personel Girişi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* SADECE TEMEL OKUNABİLİRLİK İÇİN STİL */
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input[type="text"], button { padding: 10px; margin: 5px 0; display: block; width: 100%; box-sizing: border-box; }
+        h1 { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Personel Girişi</h1>
+    
+    <p>Emir: {{ sayim_emri_id }} | Depo: {{ depo_kodu }}</p>
+    
+    <form method="POST" action="{% url 'set_personel_session' %}">
+        {% csrf_token %} 
+        
+        <input type="text" name="personel_adi" placeholder="Personel Adınız" required>
+        
+        <input type="hidden" name="sayim_emri_id" value="{{ sayim_emri_id }}">
+        <input type="hidden" name="depo_kodu" value="{{ depo_kodu }}">
+        
+        <button type="submit">Oturumu Başlat</button>
+    </form>
+</body>
+</html>
