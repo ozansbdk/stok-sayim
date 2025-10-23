@@ -92,7 +92,7 @@
         // Yükleme mesajını sıfırla
         document.getElementById('reload-message').style.display = 'none';
 
-        fetch('{% url "reload_stok_data" %}', {
+        fetch('{% url "upload_stok_excel" %}', {
             method: 'POST',
             // Content-Type başlığını FormData kullandığımızda AYARLAMIYORUZ, tarayıcı otomatik ayarlar.
             headers: { 'X-CSRFToken': CSRF_TOKEN },
