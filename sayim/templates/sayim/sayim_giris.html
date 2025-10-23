@@ -190,7 +190,8 @@
             barkod_ham_veri: barkodHamVeri || 'YOK'
         });
 
-        fetch(`/ajax/stok-ara-akilli/?${params.toString()}`)
+        // NOT: URL tag'i Django'nun AJAX uç noktasına doğru gitmelidir.
+        fetch(`{% url 'ajax_akilli_stok_ara' %}?${params.toString()}`) 
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Sunucu Hatası (${response.status}). Yanıt JSON değil.`);
@@ -260,7 +261,8 @@
         formData.append('sayim_emri_id', SAYIM_EMRI_ID);
         formData.append('depo_kodu', DEPO_KODU);
 
-        fetch(`/ajax/gemini-ocr-analiz/`, {
+        // NOT: URL tag'i Django'nun Gemini OCR uç noktasına doğru gitmelidir.
+        fetch('{% url "gemini_ocr_analiz" %}', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken'),
@@ -269,7 +271,8 @@
         })
         .then(res => {
             if (!res.ok) {
-                return res.json().catch(() => { throw new Error(`Sunucu Hatası (${res.status}). Yanıt JSON değil.`); });
+                // Eğer sunucu 404 veya 500 dönerse, JSON yanıtı gelmeyebilir.
+                return res.json().catch(() => { throw new Error(`Sunucu Hatası (${res.status}). API Key/Endpoint Kontrol Edin.`); });
             }
             return res.json();
         })
@@ -531,7 +534,8 @@
                 loc_hata: locationData.error // Konum alınamadıysa hata sebebi
             };
 
-            fetch(`/ajax/kaydet/${SAYIM_EMRI_ID}/`, {
+            // NOT: SAYIM KAYDETME URL'si buraya eklendi
+            fetch(`{% url 'ajax_sayim_kaydet' sayim_emri_id=SAYIM_EMRI_ID %}`, {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",
