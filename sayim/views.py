@@ -382,8 +382,8 @@ def stoklari_onayla_ve_kapat(request, pk):
 
 def yonetim_araclari(request):
     """Veri temizleme ve yükleme araçları sayfasını gösterir."""
-    # YONETIM.HTML yerine TEST_YONETIM.HTML kullan
-    return render(request, 'sayim/test_yonetim.html', {})
+    # Orijinal HTML dosyasını göster
+    return render(request, 'sayim/yonetim.html', {})
 
 @csrf_exempt
 @transaction.atomic
