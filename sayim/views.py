@@ -14,7 +14,7 @@ from decimal import Decimal
 
 # Model ve Form İthalatları (Kendi model ve form dosyalarınıza göre güncelleyin)
 # (Bu kısım sizde farklı olabilir, ancak ana fonksiyonlar için gereklidir)
-from .models import SayimEmri, SayimKaydi, StokMiktari
+from .models import SayimEmri, SayimDetay, Malzeme # Sayım detaylarını tutan modelinizin adı SayimDetay olmalı.
 # from .forms import SayimEmriForm # Varsayalım ki bir SayimEmri formu var
 
 
