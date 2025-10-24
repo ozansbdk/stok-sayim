@@ -19,12 +19,12 @@ from django.views.generic import ListView, CreateView, DetailView, TemplateView
 from django.urls import reverse_lazy
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
-from django.db.models import Max, F, Sum, Q # Q import edildi
+from django.db.models import Max, F, Sum, Q 
 from django.utils import timezone
-from django.utils.translation import gettext as _ # Hata mesajları için
+from django.utils.translation import gettext as _ 
 from django.core.management import call_command
 from django.contrib import messages
-# from django.contrib.auth import get_user_model # Güvenlik nedeniyle kaldırılmıştı
+# from django.contrib.auth import get_user_model # Kaldırılmıştı
 
 # Third-party Imports
 from PIL import Image
@@ -86,7 +86,7 @@ def set_personel_session(request):
 
         personel_adi = personel_adi_raw.upper() 
         
-        # ⭐ DÜZELTME 1: Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü).
+        # ⭐ DÜZELTME 1: Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü için KRİTİK).
         try:
              sayim_emri_id_int = int(sayim_emri_id) 
         except (ValueError, TypeError):
@@ -94,8 +94,11 @@ def set_personel_session(request):
              return redirect('sayim_emirleri')
 
         sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id_int)
+
+        # ⭐ DÜZELTME 2: Oturum bilgilerini kaydet
+        request.session['current_user'] = personel_adi
         
-        # ⭐ ÇOKLU GÖREV ATAMA KONTROLÜ ⭐
+        # ⭐ ÇOKLU GÖREV ATAMA KONTROLÜ (Personel adını kontrol ederken sayım_emri objesi gereklidir)
         atanan_listesi_raw = sayim_emri.atanan_personel.upper()
 
         if atanan_listesi_raw != 'ATANMADI' and atanan_listesi_raw:
@@ -104,11 +107,11 @@ def set_personel_session(request):
              if personel_adi not in atananlar:
                  messages.error(request, f"Bu sayım emri sadece {atanan_listesi_raw} kişilerine atanmıştır. Giriş yetkiniz yok.")
                  return redirect('personel_login', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
-
-        request.session['current_user'] = personel_adi
         
-        # ⭐ DÜZELTME 3: Final Yönlendirme. URL'den aldığımız ID parametresini kullanıyoruz.
+        # FINAL YÖNLENDİRME (Artık URL'ye tam uyuyoruz)
         return redirect('sayim_giris', pk=sayim_emri_id_int, depo_kodu=depo_kodu)
+
+    return redirect('sayim_emirleri')
 
 
 class DepoSecimView(TemplateView):
@@ -127,36 +130,33 @@ class SayimGirisView(DetailView):
     template_name = 'sayim/sayim_giris.html'
     context_object_name = 'sayim_emri'
     
-    # ⭐ KRİTİK ÇÖZÜM: DetailView'a hangi URL parametresini alacağını açıkça bildiriyoruz.
-    pk_url_kwarg = 'sayim_emri_id'
+    # ⭐ KRİTİK ÇÖZÜM: URL'deki parametrenin adını 'sayim_emri_id' yerine DetailView'ın beklediği 'pk' yapıyoruz.
+    pk_url_kwarg = 'pk'
     
-    # URL'de bulunan ve objeyi bulmak için kullanılmayan depo_kodu'nu görmezden gelmek için
-    # slug_url_kwarg'ı None olarak ayarlıyoruz (Bu, DetailView'ın hata vermesini engeller).
-    slug_url_kwarg = None
+    # Depo kodu parametresini görmezden gelmek için DetailView'a ayar veriyoruz.
+    slug_url_kwarg = 'depo_kodu'
     slug_field = None 
     
     def get_object(self, queryset=None):
-        # Bu metot, DetailView'ın nesneyi bulmak için URL'ye bakmasını sağlar.
+        # DetailView'ın varsayılan get_object metodunu kullanmak için pk'yı kontrol ediyoruz
         pk = self.kwargs.get(self.pk_url_kwarg)
         if pk is None:
-            # Eğer pk_url_kwarg ayarlanmış olmasına rağmen URL'de pk gelmezse 404
             raise Http404(_("Sayım Emri ID'si URL'de bulunamadı."))
         
         if queryset is None:
             queryset = self.get_queryset()
             
         try:
-            # pk_url_kwarg ile belirtilen sayim_emri_id'yi kullanarak nesneyi bulur.
             return queryset.get(pk=pk) 
         except self.model.DoesNotExist:
-            raise Http404(_("Sayım Emri bulunamadı."))
+            raise Http404("Sayım Emri bulunamadı.")
 
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        depo_kodu_raw = self.kwargs['depo_kodu']
+        # Eğer Sayım Emri başarılı bulunduysa, pk değeri mevcuttur.
+        context['depo_kodu'] = self.kwargs['depo_kodu'] 
         context['personel_adi'] = self.request.session.get('current_user', 'MISAFIR')
-        context['depo_kodu'] = standardize_id_part(depo_kodu_raw)
         context['gemini_available'] = GEMINI_AVAILABLE
         context['form'] = SayimGirisForm()
         return context
