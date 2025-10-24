@@ -72,45 +72,52 @@ class PersonelLoginView(TemplateView):
         context['sayim_emri'] = get_object_or_404(SayimEmri, pk=kwargs['sayim_emri_id'])
         return context
 
+# sayim/views.py dosyasındaki set_personel_session fonksiyonunun KESİN DÜZELTMESİ
 @csrf_exempt
 def set_personel_session(request):
     """Personel girişinde görev atama kısıtlaması kontrolü yapar."""
     if request.method == 'POST':
         personel_adi_raw = request.POST.get('personel_adi', '').strip()
-        sayim_emri_id = request.POST.get('sayim_emri_id')
+        sayim_emri_id_str = request.POST.get('sayim_emri_id') # String değeri alıyoruz
         depo_kodu = request.POST.get('depo_kodu')
 
+        # 1. KIRILMA NOKTASI: sayim_emri_id'yi en başta tamsayıya çeviriyoruz
+        try:
+             sayim_emri_id_int = int(sayim_emri_id_str)
+        except (ValueError, TypeError):
+             # Eğer ID geçersizse, genel emirler sayfasına yönlendir.
+             messages.error(request, "Sayım Emri ID'si geçersiz formatta.")
+             return redirect('sayim_emirleri') 
+
+        # 2. Giriş Kontrolü
         if not personel_adi_raw:
              messages.error(request, "Lütfen adınızı girin.")
-             return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
+             # Geri Dönüş: login-personel sayfasına doğru ID ve depo kodu ile yönlendir.
+             return redirect('personel_login', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
 
-        personel_adi = personel_adi_raw.upper() 
+        personel_adi = personel_adi_raw.upper()
         
-        # ⭐ DÜZELTME 1: Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü için KRİTİK).
-        try:
-             sayim_emri_id_int = int(sayim_emri_id) 
-        except (ValueError, TypeError):
-             messages.error(request, "Sayım Emri ID'si geçersiz formatta.")
-             return redirect('sayim_emirleri')
-
+        # Sayım Emri nesnesinin varlığını kontrol et
         sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id_int)
-
-        # ⭐ DÜZELTME 2: Oturum bilgilerini kaydet
-        request.session['current_user'] = personel_adi
         
-        # ⭐ ÇOKLU GÖREV ATAMA KONTROLÜ (Personel adını kontrol ederken sayım_emri objesi gereklidir)
+        # ⭐ ÇOKLU GÖREV ATAMA KONTROLÜ ⭐ (Bu kısım sizin orijinal kodunuzdan gelmiştir.)
         atanan_listesi_raw = sayim_emri.atanan_personel.upper()
-
         if atanan_listesi_raw != 'ATANMADI' and atanan_listesi_raw:
              atananlar = [isim.strip() for isim in atanan_listesi_raw.split(',')]
-            
              if personel_adi not in atananlar:
                  messages.error(request, f"Bu sayım emri sadece {atanan_listesi_raw} kişilerine atanmıştır. Giriş yetkiniz yok.")
                  return redirect('personel_login', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
+
+        # 3. OTURUMU KUR
+        request.session['sayim_emri_id'] = sayim_emri_id_int
+        request.session['current_user'] = personel_adi
+        request.session['depo_kodu'] = depo_kodu
         
-        # FINAL YÖNLENDİRME (Artık URL'ye tam uyuyoruz)
+        # 4. SAYIM GİRİŞİNE YÖNLENDİR (Final)
+        # URL'nize uyacak şekilde ID ve depo kodunu kullanıyoruz.
         return redirect('sayim_giris', pk=sayim_emri_id_int, depo_kodu=depo_kodu)
 
+    # POST metodu dışında bir istek gelirse yönlendir.
     return redirect('sayim_emirleri')
 
 
