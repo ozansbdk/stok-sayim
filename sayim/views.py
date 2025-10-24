@@ -7,7 +7,7 @@ from datetime import datetime
 from io import BytesIO
 import base64
 from io import BytesIO as IO_Bytes 
-from decimal import Decimal # Sayısal işlemler için
+from decimal import Decimal 
 
 # Django Imports
 from django.shortcuts import render, redirect, get_object_or_404
@@ -19,13 +19,12 @@ from django.views.generic import ListView, CreateView, DetailView, TemplateView
 from django.urls import reverse_lazy
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
-from django.db.models import Max, F, Sum 
+from django.db.models import Max, F, Sum, Q # Q import edildi
 from django.utils import timezone
+from django.utils.translation import gettext as _ # Hata mesajları için
 from django.core.management import call_command
 from django.contrib import messages
-from django.contrib.auth import get_user_model # (Gerekiyorsa, güvenlik nedeniyle kaldırılmıştı)
-from django.contrib.auth.hashers import make_password # (Gerekiyorsa, güvenlik nedeniyle kaldırılmıştı)
-from django.contrib.auth.models import User # (Gerekiyorsa, güvenlik nedeniyle kaldırılmıştı)
+# from django.contrib.auth import get_user_model # Güvenlik nedeniyle kaldırılmıştı
 
 # Third-party Imports
 from PIL import Image
@@ -37,7 +36,6 @@ from google import genai
 from google.genai.errors import APIError
 
 # Local Imports
-# SayimKaydi yerine SayimDetay kullanıyoruz (Önceki loglardan anlaşıldığı üzere)
 from .models import SayimEmri, Malzeme, SayimDetay, standardize_id_part, generate_unique_id 
 from .forms import SayimGirisForm
 
@@ -48,7 +46,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # --- GÖRÜNÜMLER (VIEWS) ---
 
-# ⭐ YENİ EKLENDİ: ImportError'a neden olan eksik sınıf
 class SayimEmirleriListView(ListView):
     model = SayimEmri
     template_name = 'sayim/sayim_emirleri.html'
@@ -87,10 +84,9 @@ def set_personel_session(request):
              messages.error(request, "Lütfen adınızı girin.")
              return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
 
-        # ⭐ DÜZELTME 1: personel_adi burada tanımlanmalıdır (UnboundLocalError çözümü).
         personel_adi = personel_adi_raw.upper() 
         
-        # ⭐ DÜZELTME 2: Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü).
+        # ⭐ DÜZELTME 1: Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü).
         try:
              sayim_emri_id_int = int(sayim_emri_id) 
         except (ValueError, TypeError):
@@ -111,8 +107,8 @@ def set_personel_session(request):
 
         request.session['current_user'] = personel_adi
         
-        # ⭐ DÜZELTME 3: Yönlendirme. URL'den aldığımız ID parametresini kullanıyoruz.
-        return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
+        # ⭐ DÜZELTME 3: Final Yönlendirme. URL'den aldığımız ID parametresini kullanıyoruz.
+        return redirect('sayim_giris', pk=sayim_emri_id_int, depo_kodu=depo_kodu)
 
 
 class DepoSecimView(TemplateView):
@@ -130,11 +126,32 @@ class SayimGirisView(DetailView):
     model = SayimEmri
     template_name = 'sayim/sayim_giris.html'
     context_object_name = 'sayim_emri'
-    # ⭐ DÜZELTME 4: DetailView'a URL parametresini tanıtıyoruz (AttributeError çözümü).
-    pk_url_kwarg = 'sayim_emri_id'  # ID'yi URL'den bu isimle al
-    slug_url_kwarg = None # Depo kodu ile veritabanında arama yapma
-    slug_field = None # Depo kodu ile veritabanında arama yapma
     
+    # ⭐ KRİTİK ÇÖZÜM: DetailView'a hangi URL parametresini alacağını açıkça bildiriyoruz.
+    pk_url_kwarg = 'sayim_emri_id'
+    
+    # URL'de bulunan ve objeyi bulmak için kullanılmayan depo_kodu'nu görmezden gelmek için
+    # slug_url_kwarg'ı None olarak ayarlıyoruz (Bu, DetailView'ın hata vermesini engeller).
+    slug_url_kwarg = None
+    slug_field = None 
+    
+    def get_object(self, queryset=None):
+        # Bu metot, DetailView'ın nesneyi bulmak için URL'ye bakmasını sağlar.
+        pk = self.kwargs.get(self.pk_url_kwarg)
+        if pk is None:
+            # Eğer pk_url_kwarg ayarlanmış olmasına rağmen URL'de pk gelmezse 404
+            raise Http404(_("Sayım Emri ID'si URL'de bulunamadı."))
+        
+        if queryset is None:
+            queryset = self.get_queryset()
+            
+        try:
+            # pk_url_kwarg ile belirtilen sayim_emri_id'yi kullanarak nesneyi bulur.
+            return queryset.get(pk=pk) 
+        except self.model.DoesNotExist:
+            raise Http404(_("Sayım Emri bulunamadı."))
+
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         depo_kodu_raw = self.kwargs['depo_kodu']
