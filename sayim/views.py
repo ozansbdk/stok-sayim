@@ -22,9 +22,10 @@ from django.db.models import Max, F
 from django.utils import timezone
 from django.core.management import call_command
 from django.contrib import messages
-# from django.contrib.auth import get_user_model # Kaldırıldı
-# from django.contrib.auth.hashers import make_password # Kaldırıldı
-# from django.contrib.auth.models import User # Kaldırıldı
+# Güvenlik nedeniyle kaldırıldı:
+# from django.contrib.auth import get_user_model
+# from django.contrib.auth.hashers import make_password
+# from django.contrib.auth.models import User 
 
 # Third-party Imports
 from PIL import Image
@@ -36,7 +37,6 @@ from google import genai
 from google.genai.errors import APIError
 
 # Local Imports
-# NOT: Bu import satırı sizin modellerinize ve yardımcı fonksiyonlarınıza bağlıdır.
 from .models import SayimEmri, Malzeme, SayimDetay, standardize_id_part, generate_unique_id
 from .forms import SayimGirisForm
 
@@ -434,9 +434,9 @@ def upload_and_reload_stok_data(request):
                          # KULLANILAN BAŞLIKLAR: "Stok Kodu", "Parti", "Renk", "Depo Kodu", "Miktar", "Maliyet birim", "Grup", "Stok Adı", "Birim"
                          
                          stok_kod = standardize_id_part(row.get('Stok Kodu', 'YOK'))
-                         parti_no = standardize_id_part(row.get('Parti', 'YOK')) # Düzeltildi: 'Parti'
+                         parti_no = standardize_id_part(row.get('Parti', 'YOK')) 
                          renk = standardize_id_part(row.get('Renk', 'YOK'))
-                         lokasyon_kodu = standardize_id_part(row.get('Depo Kodu', 'MERKEZ')) # Düzeltildi: 'Depo Kodu'
+                         lokasyon_kodu = standardize_id_part(row.get('Depo Kodu', 'MERKEZ')) 
                          
                          if stok_kod == 'YOK':
                              fail_count += 1
@@ -444,12 +444,12 @@ def upload_and_reload_stok_data(request):
 
                          benzersiz_id = generate_unique_id(stok_kod, parti_no, lokasyon_kodu, renk)
 
-                         # VERİ EŞLEME HATASI BURADA DÜZELTİLDİ:
-                         sistem_miktari = float(row.get('Miktar', 0.0) or 0.0) # Düzeltildi: 'Miktar'
-                         birim_fiyati = float(row.get('Maliyet birim', 0.0) or 0.0) # Düzeltildi: 'Maliyet birim'
-                         stok_grubu = row.get('Grup', 'GENEL') # Düzeltildi: 'Grup'
-                         stok_adi = row.get('Stok Adı', f"Stok {stok_kod}") # Düzeltildi: 'Stok Adı'
-                         birim = row.get('Birim', 'ADET') # Düzeltildi: 'Birim'
+                         # VERİ EŞLEME KISMI
+                         sistem_miktari = float(row.get('Miktar', 0.0) or 0.0) 
+                         birim_fiyati = float(row.get('Maliyet birim', 0.0) or 0.0) 
+                         stok_grubu = row.get('Grup', 'GENEL') 
+                         stok_adi = row.get('Stok Adı', f"Stok {stok_kod}")
+                         birim = row.get('Birim', 'ADET')
                          
                          Malzeme.objects.update_or_create(
                              benzersiz_id=benzersiz_id,
@@ -463,7 +463,7 @@ def upload_and_reload_stok_data(request):
                                  'stok_grup': stok_grubu,
                                  'sistem_stogu': sistem_miktari,
                                  'birim_fiyat': birim_fiyati,
-                                 'sistem_tutari': sistem_miktari * birim_fiyati # Tutar hesaplanıyor
+                                 'sistem_tutari': sistem_miktari * birim_fiyati 
                              }
                          )
                          success_count += 1
@@ -536,41 +536,3 @@ def export_excel(request, pk):
 def export_mutabakat_excel(request, pk):
     # ... (kod aynı kaldı)
     return HttpResponse("Mutabakat Excel İndirme Başarılı")
-
-# Not: admin_kurulum_final ve load_initial_stock_data kaldırılmıştır.
-```Bu, Excel yükleme işleminde karşılaştığınız **ikinci ve son veri eşleme sorununu** çözmek için en önemli adımdır.
-
-Loglar, son `NoReverseMatch` hatasının çözüldüğünü gösteriyor. Şimdi, son bir `push` ile **Excel veri eşleme** sorununu ve **Gemini URL** sorununu aynı anda çözelim.
-
-### ✅ Çözüm: Final Kod Düzeltmeleri ve Push
-
-**`sayim/views.py`** dosyasındaki `upload_and_reload_stok_data` fonksiyonunu, sizin sağladığınız tüm Excel sütun başlıklarını kullanacak şekilde **revize ettim** (Parti, Depo Kodu, Miktar, Maliyet birim, Grup, Stok Adı, Birim).
-
-Bu revizyonlar, `Miktar` ve `Tutar` alanlarının **0 gelmesi** sorununu çözmelidir.
-
-#### Adım 1: Kodunuzu Güncelleyin
-
-Yukarıdaki yanıtımda yer alan **tam `sayim/views.py` içeriğini** kullanın. (Bu kod, `upload_and_reload_stok_data` içindeki sütun adlarını düzeltti ve `admin_kurulum_final` gibi güvenlik risklerini ortadan kaldırdı.)
-
-#### Adım 2: Gemini URL'sini Düzeltin
-
-Daha önce tespit ettiğimiz 404 hatasını çözmek için **`sayim/templates/sayim/raporlama.html`** ve **`sayim/templates/sayim/sayim_giris.html`** dosyalarınızdaki Gemini URL'sinin de doğru olduğundan emin olun:
-
-| Dosya | HTML/JS Satırı |
-| :--- | :--- |
-| **`sayim_giris.html`** | `fetch('{% url "gemini_ocr_analiz" %}', { ...` |
-| **`raporlama.html`** | `<a href="{% url 'analiz_fark_ozeti' pk=sayim_emri.pk %}" ...` (Bu, `canli_fark_ozeti` olarak düzeltilmişti.) |
-
-#### Adım 3: Final Git Push
-
-Bu son düzeltmeleri GitHub'a gönderin. Bu, Render'da hem veri eşleme hem de URL hatalarını çözecek olan yeni bir dağıtımı tetikleyecektir:
-
-```bash
-# Tüm değiştirilen HTML ve Python dosyalarını ekle
-git add . 
-
-# Değişikliği kaydet
-git commit -m "FINAL FIX: Excel veri eşleme (0 hatası) ve Gemini API URL'si düzeltildi."
-
-# GitHub'a gönder (Bu, uygulamanızın hatasız çalışmasını sağlamalıdır)
-git push origin master
