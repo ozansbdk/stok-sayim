@@ -112,7 +112,7 @@ def set_personel_session(request):
         request.session['current_user'] = personel_adi
         
         # ⭐ DÜZELTME 3: Yönlendirme. URL'den aldığımız ID parametresini kullanıyoruz.
-        return redirect('sayim_giris', pk=sayim_emri_id_int, depo_kodu=depo_kodu)
+        return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
 
 
 class DepoSecimView(TemplateView):
