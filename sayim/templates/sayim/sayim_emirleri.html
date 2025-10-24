@@ -8,7 +8,7 @@
         /* Basit CSS stilleri */
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
         .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #333; border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+        h1 { color: #333; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
         .emir { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; }
         .emir-acik { background-color: #e6ffe6; border-left: 5px solid #4CAF50; }
         .emir-kapali { background-color: #eee; border-left: 5px solid #999; }
@@ -34,14 +34,19 @@
                 {% if emir.durum == 'Açık' %}
                     <a href="{% url 'depo_secim' sayim_emri_id=emir.pk %}" class="baslat-btn">SAYIM GİRİŞİNE GİT</a>
                     
-                    <a href="{% url 'raporlama_onay' pk=emir.pk %}" class="baslat-btn" style="background-color: darkred;">RAPORLAMA/ONAY</a> 
+                    <a href="{% url 'raporlama_onay' sayim_emri_id=emir.pk %}" class="baslat-btn" style="background-color: darkred;">RAPORLAMA/ONAY</a> 
                 {% else %}
-                    <a href="{% url 'raporlama_onay' pk=emir.pk %}" class="baslat-btn" style="background-color: #999;">RAPORU GÖR</a>
+                    <a href="{% url 'raporlama_onay' sayim_emri_id=emir.pk %}" class="baslat-btn" style="background-color: #999;">RAPORU GÖR</a>
                 {% endif %}
             </div>
         {% empty %}
-            <p>Aktif veya tamamlanmış sayım emri bulunamadı. Lütfen yeni bir emir oluşturun.</p>
+            <p>Aktif veya tamamlanmış sayım emri bulunmamaktadır. Lütfen yeni bir emir oluşturun.</p>
         {% endfor %}
+        
+        <p style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
+            <a href="{% url 'yonetim_araclari' %}">⚙️ Yönetim Araçları (Excel Yükleme)</a>
+        </p>
+        
     </div>
 </body>
 </html>
