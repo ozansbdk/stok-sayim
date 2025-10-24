@@ -138,7 +138,7 @@ class SayimGirisView(DetailView):
     context_object_name = 'sayim_emri'
     
     # ⭐ KRİTİK ÇÖZÜM: URL'deki parametrenin adını 'sayim_emri_id' yerine DetailView'ın beklediği 'pk' yapıyoruz.
-    pk_url_kwarg = 'pk'
+    pk_url_kwarg = 'sayim_emri_id'
     
     # Depo kodu parametresini görmezden gelmek için DetailView'a ayar veriyoruz.
     slug_url_kwarg = 'depo_kodu'
