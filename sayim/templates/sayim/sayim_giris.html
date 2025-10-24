@@ -122,7 +122,8 @@
     let currentRenk = 'YOK';
     let currentSeriNo = 'YOK';
     
-    // ⭐ KRİTİK DÜZELTME: SAYIM EMRİ ID'sini doğrudan template tag'inden alıyoruz.
+    // ⭐ KRİTİK ÇÖZÜM: SAYIM EMRİ ID'sini doğrudan template tag'inden alıyoruz.
+    // Bu, NoReverseMatch hatasını çözer.
     const SAYIM_EMRI_ID = "{{ sayim_emri.pk }}"; 
     
     // CSRF Token Fonksiyonu (Django POST için kritik)
@@ -483,8 +484,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         // --- TEMEL TANIMLARI GÜNCELLE ---
         DEPO_KODU = document.getElementById('depo_kodu_gizli').innerText.trim();
-        // ⭐ KRİTİK DÜZELTME: SAYIM EMRİ ID'sini doğrudan template tag'inden alıyoruz.
-        // Bu değişken, views.py'daki son düzeltmeyle birlikte çalışmalıdır.
+        // ⭐ SAYIM_EMRI_ID'nin değeri global scope'da {{ sayim_emri.pk }} olarak atanmıştır.
         const PERSONEL_ADI = document.getElementById('personel_adi_gizli').innerText.trim();
         const miktarInput = document.getElementById('miktar_input');
 

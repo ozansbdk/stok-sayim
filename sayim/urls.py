@@ -28,10 +28,10 @@ urlpatterns = [
     path('<int:sayim_emri_id>/depo-secim/', DepoSecimView.as_view(), name='depo_secim'),
     
     # ⭐ KRİTİK ÇÖZÜM: SAYIM GİRİŞİ URL'Sİ
-    # Artık 'pk' yerine 'sayim_emri_id' kullanıyoruz.
+    # View'daki pk_url_kwarg ayarı ile uyumlu olması için sayim_emri_id kullanıldı.
     path('sayim/<int:sayim_emri_id>/<str:depo_kodu>/', SayimGirisView.as_view(), name='sayim_giris'),
     
-    # 3. RAPORLAMA VE ANALİZ (Tüm pk'ları sayim_emri_id ile değiştirin)
+    # 3. RAPORLAMA VE ANALİZ (Tüm pk'lar sayim_emri_id ile değiştirildi)
     path('rapor/<int:sayim_emri_id>/', RaporlamaView.as_view(), name='raporlama_onay'),
     path('analiz/performans/<int:sayim_emri_id>/', PerformansAnaliziView.as_view(), name='analiz_performans'),
     path('analiz/fark-ozeti/<int:sayim_emri_id>/', CanliFarkOzetiView.as_view(), name='canli_fark_ozeti'),
@@ -49,7 +49,7 @@ urlpatterns = [
     
     # 5. AJAX Endpoints
     path('ajax/akilli-stok-ara/', ajax_akilli_stok_ara, name='ajax_akilli_stok_ara'),
-    # AJAX SAYIM KAYDETME
+    # AJAX SAYIM KAYDETME (sayim_emri_id parametresini bekliyor)
     path('ajax/sayim-kaydet/<int:sayim_emri_id>/', ajax_sayim_kaydet, name='ajax_sayim_kaydet'), 
     
     path('ajax/ocr-analiz/', gemini_ocr_analiz, name='gemini_ocr_analiz'),
