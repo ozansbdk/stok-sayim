@@ -115,7 +115,7 @@ def set_personel_session(request):
         
         # 4. SAYIM GİRİŞİNE YÖNLENDİR (Final)
         # URL'nize uyacak şekilde ID ve depo kodunu kullanıyoruz.
-        return redirect('sayim_giris', pk=sayim_emri_id_int, depo_kodu=depo_kodu)
+        return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
 
     # POST metodu dışında bir istek gelirse yönlendir.
     return redirect('sayim_emirleri')
