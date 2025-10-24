@@ -32,7 +32,7 @@
         <p>Sayım Emri: <strong>{{ sayim_emri.ad }}</strong> (ID: {{ sayim_emri.pk }})</p>
         <p>Depo Kodu: <strong id="depo_kodu_gizli">{{ depo_kodu }}</strong></p>
         <p>Personel: <strong id="personel_adi_gizli">{{ personel_adi }}</strong></p>
-        <a href="{% url 'raporlama_onay' pk=sayim_emri.pk %}">Raporlama ve Onay Ekranına Git</a>
+        <a href="{% url 'raporlama_onay' sayim_emri_id=sayim_emri.pk %}">Raporlama ve Onay Ekranına Git</a>
     </div>
 
     <h2>1. Stok Arama ve Veri Girişi</h2>

@@ -21,7 +21,7 @@
         <h1>Canlı Stok Grup Bazında Mutabakat Özeti</h1>
         <h2 style="color: #6c757d; font-size: 1.2em;">Emir: {{ sayim_emri.ad }} (ID: {{ sayim_emri.pk }})</h2>
 
-        <p style="margin-top: 20px;"><a href="{% url 'raporlama_onay' pk=sayim_emri.pk %}">← Mutabakat Raporuna Geri Dön</a></p>
+        <p style="margin-top: 20px;"><a href="{% url 'raporlama_onay' sayim_emri_id=sayim_emri.pk %}">← Mutabakat Raporuna Geri Dön</a></p>
 
         {% if hata %}
             <p style="color: red; font-weight: bold;">HATA: {{ hata }}</p>
