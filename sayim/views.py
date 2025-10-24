@@ -82,7 +82,7 @@ def set_personel_session(request):
 
         if not personel_adi_raw:
              messages.error(request, "Lütfen adınızı girin.")
-             return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
+             return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
 
         personel_adi = personel_adi_raw.upper() 
         
