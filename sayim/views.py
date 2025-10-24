@@ -116,6 +116,7 @@ class SayimGirisView(DetailView):
     model = SayimEmri
     template_name = 'sayim/sayim_giris.html'
     context_object_name = 'sayim_emri'
+    pk_url_kwarg = 'sayim_emri_id'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
