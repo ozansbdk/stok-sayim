@@ -27,30 +27,29 @@ urlpatterns = [
     path('set-personel-session/', set_personel_session, name='set_personel_session'),
     path('<int:sayim_emri_id>/depo-secim/', DepoSecimView.as_view(), name='depo_secim'),
     
-    # 🛑 Sayım Giriş View'ı için PK kullanılıyor, AJAX'da ID kullanılıyor.
-    # Sayım Girişi (sayim/2/1 KALİTE DEPO MAMUL/)
+    # ⭐ KRİTİK ÇÖZÜM: SAYIM GİRİŞİ URL'Sİ
+    # Artık 'pk' yerine 'sayim_emri_id' kullanıyoruz.
     path('sayim/<int:sayim_emri_id>/<str:depo_kodu>/', SayimGirisView.as_view(), name='sayim_giris'),
     
-    # 3. RAPORLAMA VE ANALİZ
-    path('rapor/<int:pk>/', RaporlamaView.as_view(), name='raporlama_onay'),
-    path('analiz/performans/<int:pk>/', PerformansAnaliziView.as_view(), name='analiz_performans'),
-    path('analiz/fark-ozeti/<int:pk>/', CanliFarkOzetiView.as_view(), name='canli_fark_ozeti'),
-    path('analiz/konum/<int:pk>/', KonumAnaliziView.as_view(), name='analiz_konum'),
+    # 3. RAPORLAMA VE ANALİZ (Tüm pk'ları sayim_emri_id ile değiştirin)
+    path('rapor/<int:sayim_emri_id>/', RaporlamaView.as_view(), name='raporlama_onay'),
+    path('analiz/performans/<int:sayim_emri_id>/', PerformansAnaliziView.as_view(), name='analiz_performans'),
+    path('analiz/fark-ozeti/<int:sayim_emri_id>/', CanliFarkOzetiView.as_view(), name='canli_fark_ozeti'),
+    path('analiz/konum/<int:sayim_emri_id>/', KonumAnaliziView.as_view(), name='analiz_konum'),
 
     # 4. YÖNETİM VE VERİ İŞLEMLERİ
-    path('stoklari-onayla/<int:pk>/', stoklari_onayla_ve_kapat, name='stoklari_onayla'),
+    path('stoklari-onayla/<int:sayim_emri_id>/', stoklari_onayla_ve_kapat, name='stoklari_onayla'),
     path('yonetim-araclari/', yonetim_araclari, name='yonetim_araclari'),
     path('reset-sayim-data/', reset_sayim_data, name='reset_sayim_data'),
 
     # Excel Yükleme ve İndirme
     path('upload-stok-excel/', upload_and_reload_stok_data, name='upload_stok_excel'), 
-    path('export/excel/<int:pk>/', export_excel, name='export_excel'),
-    path('export/mutabakat-excel/<int:pk>/', export_mutabakat_excel, name='export_mutabakat_excel'),
+    path('export/excel/<int:sayim_emri_id>/', export_excel, name='export_excel'),
+    path('export/mutabakat-excel/<int:sayim_emri_id>/', export_mutabakat_excel, name='export_mutabakat_excel'),
     
     # 5. AJAX Endpoints
     path('ajax/akilli-stok-ara/', ajax_akilli_stok_ara, name='ajax_akilli_stok_ara'),
-    
-    # 🛑 DÜZELTME: AJAX URL'si artık sayım emri ID'sini bekliyor!
+    # AJAX SAYIM KAYDETME
     path('ajax/sayim-kaydet/<int:sayim_emri_id>/', ajax_sayim_kaydet, name='ajax_sayim_kaydet'), 
     
     path('ajax/ocr-analiz/', gemini_ocr_analiz, name='gemini_ocr_analiz'),
