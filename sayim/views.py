@@ -131,8 +131,9 @@ class SayimGirisView(DetailView):
     template_name = 'sayim/sayim_giris.html'
     context_object_name = 'sayim_emri'
     # ⭐ DÜZELTME 4: DetailView'a URL parametresini tanıtıyoruz (AttributeError çözümü).
-    pk_url_kwarg = 'pk'
-    slug_url_kwarg = 'depo_kodu' # Bu parametre Sayım Emri'ni bulmak için kullanılmasa da URL'de kalmalı
+    pk_url_kwarg = 'sayim_emri_id'  # ID'yi URL'den bu isimle al
+    slug_url_kwarg = None # Depo kodu ile veritabanında arama yapma
+    slug_field = None # Depo kodu ile veritabanında arama yapma
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
