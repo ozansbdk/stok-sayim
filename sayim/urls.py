@@ -29,7 +29,7 @@ urlpatterns = [
     
     # 🛑 Sayım Giriş View'ı için PK kullanılıyor, AJAX'da ID kullanılıyor.
     # Sayım Girişi (sayim/2/1 KALİTE DEPO MAMUL/)
-    path('sayim/<int:pk>/<str:depo_kodu>/', SayimGirisView.as_view(), name='sayim_giris'), 
+    path('sayim/<int:sayim_emri_id>/<str:depo_kodu>/', SayimGirisView.as_view(), name='sayim_giris'), # ✅ Yenisi 
     
     # 3. RAPORLAMA VE ANALİZ
     path('rapor/<int:pk>/', RaporlamaView.as_view(), name='raporlama_onay'),
