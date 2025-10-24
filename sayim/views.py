@@ -72,17 +72,30 @@ class PersonelLoginView(TemplateView):
         context['sayim_emri'] = get_object_or_404(SayimEmri, pk=kwargs['sayim_emri_id'])
         return context
 
+# sayim/views.py
 @csrf_exempt
 def set_personel_session(request):
-    """Personel girişinde görev atama kısıtlaması kontrolü yapar."""
+    # ... (diğer kodlar)
+
     if request.method == 'POST':
         personel_adi_raw = request.POST.get('personel_adi', '').strip()
-        sayim_emri_id = request.POST.get('sayim_emri_id')
-        depo_kodu = request.POST.get('depo_kodu')
+        
+        # ⭐ KIRILMA NOKTASI: Değeri zorla tamsayıya çeviriyoruz (pk/id olduğu için)
+        try:
+            sayim_emri_id = int(request.POST.get('sayim_emri_id')) 
+        except (ValueError, TypeError):
+            # Eğer değer tamsayı değilse, hata mesajı gösterip geri dönelim
+            messages.error(request, "Sayım Emri ID'si geçersiz formatta.")
+            return redirect('depo_secim', sayim_emri_id=request.POST.get('sayim_emri_id')) # Veya uygun bir hata sayfasına yönlendirin
 
-        if not personel_adi_raw:
-             messages.error(request, "Lütfen adınızı girin.")
-             return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
+        depo_kodu = request.POST.get('depo_kodu')
+        
+        # ... (diğer kontrol kodları)
+        
+        request.session['current_user'] = personel_adi
+        
+        # Sayım Girişi sayfasına yönlendirme (Artık sayim_emri_id'nin int olduğundan eminiz)
+        return redirect('sayim_giris', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
 
         personel_adi = personel_adi_raw.upper()
         sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
