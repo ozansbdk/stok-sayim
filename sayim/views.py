@@ -98,7 +98,7 @@ def set_personel_session(request):
                  return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
 
         request.session['current_user'] = personel_adi
-        return redirect('sayim_giris', pk=sayim_emri_id, depo_kodu=depo_kodu)
+        return redirect('sayim_giris', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
 
 
 class DepoSecimView(TemplateView):
