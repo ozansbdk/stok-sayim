@@ -73,20 +73,50 @@ class PersonelLoginView(TemplateView):
         return context
 
 # sayim/views.py
+# sayim/views.py
+
 @csrf_exempt
 def set_personel_session(request):
-    # ... (diğer kodlar)
-
     if request.method == 'POST':
         personel_adi_raw = request.POST.get('personel_adi', '').strip()
+        sayim_emri_id = request.POST.get('sayim_emri_id')
+        depo_kodu = request.POST.get('depo_kodu')
+
+        if not personel_adi_raw:
+             messages.error(request, "Lütfen adınızı girin.")
+             return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
+
+        # ⭐ DÜZELTME 1: personel_adi burada tanımlanmalıdır.
+        personel_adi = personel_adi_raw.upper() 
         
-        # ⭐ KIRILMA NOKTASI: Değeri zorla tamsayıya çeviriyoruz (pk/id olduğu için)
+        sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
+        
+        # ⭐ DÜZELTME 2: sayim_emri_id'yi tamsayıya çeviriyoruz (Önceki hatayı çözmek için)
         try:
-            sayim_emri_id = int(request.POST.get('sayim_emri_id')) 
+             # sayim_emri_id'nin tamsayı olduğundan emin ol
+             sayim_emri_id = int(sayim_emri_id) 
         except (ValueError, TypeError):
-            # Eğer değer tamsayı değilse, hata mesajı gösterip geri dönelim
-            messages.error(request, "Sayım Emri ID'si geçersiz formatta.")
-            return redirect('depo_secim', sayim_emri_id=request.POST.get('sayim_emri_id')) # Veya uygun bir hata sayfasına yönlendirin
+             messages.error(request, "Sayım Emri ID'si geçersiz formatta.")
+             return redirect('sayim_emirleri')
+
+        # ⭐ ÇOKLU GÖREV ATAMA KONTROLÜ (İçinde "return" olduğu için personel_adi kayboluyor olabilir.)
+        atanan_listesi_raw = sayim_emri.atanan_personel.upper()
+
+        if atanan_listesi_raw != 'ATANMADI' and atanan_listesi_raw:
+             atananlar = [isim.strip() for isim in atanan_listesi_raw.split(',')]
+            
+             if personel_adi not in atananlar:
+                 messages.error(request, f"Bu sayım emri sadece {atanan_listesi_raw} kişilerine atanmıştır. Giriş yetkiniz yok.")
+                 return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
+
+
+        # ⭐ HATA OLAN SATIRDA personel_adi artık tanımlı.
+        request.session['current_user'] = personel_adi # <--- Bu satır şimdi çalışmalı
+        
+        # FINAL YÖNLENDİRME (Artık sayim_emri_id'nin int olduğundan eminiz ve doğru parametre adını kullanıyoruz)
+        return redirect('sayim_giris', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu) 
+
+    return redirect('depo_secim', sayim_emri_id=request.POST.get('sayim_emri_id')) # Geri dönüşü düzenledik
 
         depo_kodu = request.POST.get('depo_kodu')
         
