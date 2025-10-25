@@ -550,7 +550,7 @@ def get_last_sayim_info(benzersiz_id):
     return None
 
 # ####################################################################################
-# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - DOLDURULDU
+# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - YENİ HİYERARŞİ VE UYARI
 # ####################################################################################
 
 @csrf_exempt
@@ -573,29 +573,38 @@ def ajax_akilli_stok_ara(request):
         'last_sayim': 'Bilinmiyor',
         'parti_varyantlar': [],
         'renk_varyantlar': [],
-        'farkli_depo_uyarisi': '' # Yeni uyarı alanı
+        'farkli_depo_uyarisi': '' 
     }
     
     malzeme = None
     
     # -----------------------------------------------------------
-    # 1. Seri No / Barkod ile Tam Eşleşme (En Yüksek Öncelik)
+    # 1. Hiyerarşi: Seri No / Barkod ile Arama (En Yüksek Öncelik)
     # -----------------------------------------------------------
     if seri_no != 'YOK':
-        # Malzeme tablosunda benzersiz_id veya malzeme_kodu içinde arama
-        barkod_q = Q(benzersiz_id__icontains=seri_no) | Q(malzeme_kodu__iexact=seri_no)
-        # Sadece ilgili depodaki kaydı bulmaya çalış
+        # Benzersiz ID'de tam arama veya Malzeme Kodu/Parti/Renk içinde kısmi arama
+        barkod_q = Q(benzersiz_id__iexact=seri_no) | Q(malzeme_kodu__iexact=seri_no)
         malzeme = Malzeme.objects.filter(barkod_q & Q(lokasyon_kodu=depo_kod)).first()
 
     # -----------------------------------------------------------
-    # 2. Parti No ile Arama (Parti, Stok Kodu ve Renk ile Tam Eşleşme)
+    # 2. Hiyerarşi: Stok Kodu + Parti No + Renk ile Tam Eşleşme
     # -----------------------------------------------------------
-    if not malzeme and parti_no != 'YOK' and stok_kod != 'YOK' and renk != 'YOK':
+    if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
         benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
         malzeme = Malzeme.objects.filter(benzersiz_id=benzersiz_id).first()
+    
+    # -----------------------------------------------------------
+    # 3. Hiyerarşi: Stok Kodu + Parti (Parti odaklı eşleşme)
+    # -----------------------------------------------------------
+    if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK':
+        malzeme = Malzeme.objects.filter(
+            malzeme_kodu=stok_kod, 
+            parti_no=parti_no,
+            lokasyon_kodu=depo_kod
+        ).first()
 
     # -----------------------------------------------------------
-    # 3. Stok Kodu & Varyant ile Arama (Parti/Renk Seçimi Gerekir)
+    # 4. Hiyerarşi: Stok Kodu (Varyant Listesi/Tek Varyant)
     # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK':
         
@@ -607,25 +616,19 @@ def ajax_akilli_stok_ara(request):
 
         if varyantlar:
             
-            # Eğer Stok Kodu ve Parti/Renk de girilmişse, tam eşleşmeye git
-            if parti_no != 'YOK' or renk != 'YOK':
-                final_malzeme = Malzeme.objects.filter(
-                    malzeme_kodu=stok_kod,
-                    lokasyon_kodu=depo_kod,
-                    parti_no=parti_no,
-                    renk=renk
-                ).first()
-                if final_malzeme:
-                    malzeme = final_malzeme # Tam eşleşme bulundu
-                # Eğer bulunamazsa, varyant listesini gösterir.
-                
-            # Eğer tam eşleşme bulunamadıysa ve birden fazla varyant varsa, listeyi göster
+            # Eğer tek bir varyant varsa, onu otomatik olarak seç
+            if len(varyantlar) == 1:
+                v = varyantlar[0]
+                benzersiz_id = generate_unique_id(stok_kod, v['parti_no'], depo_kod, v['renk'])
+                malzeme = Malzeme.objects.filter(benzersiz_id=benzersiz_id).first()
+            
+            # Birden fazla varyant varsa, liste döndür
             if not malzeme and len(varyantlar) > 0:
                 response_data['urun_bilgi'] = f"Varyant Seçimi Gerekli: {stok_kod} için {len(varyantlar)} varyant bulundu."
                 response_data['stok_kod'] = stok_kod 
                 response_data['parti_varyantlar'] = sorted(list(set([v['parti_no'] for v in varyantlar if v['parti_no'] != 'YOK'])))
                 response_data['renk_varyantlar'] = sorted(list(set([v['renk'] for v in varyantlar if v['renk'] != 'YOK'])))
-                return JsonResponse(response_data) # Varyant seçimi listesi döndür
+                return JsonResponse(response_data) 
     
     # -----------------------------------------------------------
     # NİHAİ SONUÇ İŞLEME
@@ -648,7 +651,7 @@ def ajax_akilli_stok_ara(request):
 
         response_data.update({
             'found': True,
-            'urun_bilgi': f"{malzeme.malzeme_adi} ({malzeme.malzeme_kodu}) - {malzeme.parti_no}/{malzeme.renk}",
+            'urun_bilgi': f"{malzeme.malzeme_adi} ({malzeme.malzeme_kodu}) - Parti: {malzeme.parti_no} / Renk: {malzeme.renk}",
             'stok_kod': malzeme.malzeme_kodu,
             'parti_no': malzeme.parti_no,
             'renk': malzeme.renk,
@@ -666,7 +669,7 @@ def ajax_akilli_stok_ara(request):
     return JsonResponse(response_data)
 
 # ####################################################################################
-# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Konum Takibi Eklendi) - DOLDURULDU
+# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Kayıt Hatası Çözümü ve Veri Temizliği)
 # ####################################################################################
 
 @csrf_exempt
@@ -675,6 +678,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
         try:
             data = json.loads(request.body)
             
+            # Gelen veriyi standardize_id_part ile temizle
             stok_kod = standardize_id_part(data.get('stok_kod', 'YOK'))
             parti_no = standardize_id_part(data.get('parti_no', 'YOK'))
             renk = standardize_id_part(data.get('renk', 'YOK'))
@@ -688,8 +692,11 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             loc_hata = data.get('loc_hata', '')
 
             # 1. Malzeme ve Sayım Emrini Bul
+            # Benzersiz ID'yi temizlenmiş verilerle oluştur
             benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
-            malzeme = get_object_or_404(Malzeme, benzersiz_id=benzersiz_id)
+            
+            # Malzeme kaydını bulurken sadece benzersiz_id kullanıyoruz.
+            malzeme = Malzeme.objects.get(benzersiz_id=benzersiz_id) 
             sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
             
             if sayim_emri.durum != 'Açık':
@@ -710,7 +717,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 konum_hata_mesaji=loc_hata
             )
 
-            # 3. Toplam Sayılan Miktarı Hesapla (Bu sadece gösterim amaçlıdır, ana stok güncellemeyi onay butonu yapar)
+            # 3. Toplam Sayılan Miktarı Hesapla
             toplam_sayilan = SayimDetay.objects.filter(
                 benzersiz_malzeme=malzeme
             ).aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or 0.0
@@ -722,11 +729,13 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             })
 
         except Malzeme.DoesNotExist:
-            return JsonResponse({'success': False, 'message': f"HATA: {stok_kod} ({parti_no}) malzemesi veritabanında bulunamadı."}, status=404)
+            # Kayıt hatası çözümü: Hatanın nedenini tam olarak gösteriyoruz.
+            hata_mesaji = f"HATA: Stok Kodu: {stok_kod}, Parti No: {parti_no}, Renk: {renk}, Depo: {depo_kod} kombinasyonu veritabanında bulunamadı. Lütfen arama yapın."
+            return JsonResponse({'success': False, 'message': hata_mesaji}, status=404)
         except SayimEmri.DoesNotExist:
             return JsonResponse({'success': False, 'message': "HATA: Geçersiz Sayım Emri ID'si."}, status=404)
         except Exception as e:
-            # print(f"Sayım Kaydetme Hatası: {e}") 
+            # Diğer tüm kritik hataları yakala
             return JsonResponse({'success': False, 'message': f"Kritik Kayıt Hatası: {str(e)}"}, status=500)
 
     return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=400)
