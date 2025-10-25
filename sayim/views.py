@@ -87,7 +87,7 @@ def set_personel_session(request):
 
         personel_adi = personel_adi_raw.upper() 
         
-        # ⭐ Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü için KRİTİK)
+        # ⭐ Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü için KRİTİK).
         try:
              sayim_emri_id_int = int(sayim_emri_id) 
         except (ValueError, TypeError):
@@ -110,6 +110,7 @@ def set_personel_session(request):
                  return redirect('personel_login', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
         
         # FINAL YÖNLENDİRME (Artık URL'ye tam uyuyoruz ve pk= kullanmıyoruz)
+        # NOT: URL'nizdeki sayim_emri_id parametresi ile uyumlu olmalıdır.
         return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
 
     return redirect('sayim_emirleri')
@@ -131,7 +132,7 @@ class SayimGirisView(DetailView):
     template_name = 'sayim/sayim_giris.html'
     context_object_name = 'sayim_emri'
     
-    # ⭐ KRİTİK ÇÖZÜM: View'a URL'den 'sayim_emri_id' parametresini almasını söylüyoruz.
+    # ⭐ KRİTİK ÇÖZÜM: DetailView'a URL'den 'sayim_emri_id' parametresini almasını söylüyoruz.
     pk_url_kwarg = 'sayim_emri_id'
     
     # URL'de bulunan depo_kodu parametresini DetailView'ın aramasını engelliyoruz.
@@ -139,7 +140,7 @@ class SayimGirisView(DetailView):
     slug_field = None 
     
     def get_object(self, queryset=None):
-        # DetailView'ın varsayılan get_object metodunu geçersiz kılıyoruz (AttributeError çözümü).
+        # Sayım Emri objesini bulmak için sadece 'sayim_emri_id' parametresini kullanır.
         pk = self.kwargs.get(self.pk_url_kwarg)
         if pk is None:
             raise Http404(_("Sayım Emri ID'si URL'de bulunamadı."))
@@ -155,6 +156,7 @@ class SayimGirisView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Eğer Sayım Emri başarılı bulunduysa, pk değeri mevcuttur.
         context['depo_kodu'] = self.kwargs['depo_kodu'] 
         context['personel_adi'] = self.request.session.get('current_user', 'MISAFIR')
         context['gemini_available'] = GEMINI_AVAILABLE
