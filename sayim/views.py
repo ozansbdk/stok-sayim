@@ -697,7 +697,7 @@ def ajax_akilli_stok_ara(request):
         
     # Bulunamadı
     aranan = seri_no if seri_no != 'YOK' else (parti_no if parti_no != 'YOK' else stok_kod)
-    response_data['urun_bilgi'] = f"'{aranan}' ile '{depo_kod}' deposunda bulunamadı."
+    response_data['urun_bilgi'] = f"'{aranan}' bilgisi ile '{depo_kod}' deposunda bulunamadı."
     print(f">> SONUÇ: Bulunamadı.")
     print(f"--- ARAMA BİTTİ (Başarısız) ---")
     return JsonResponse(response_data)
@@ -780,9 +780,27 @@ def gemini_ocr_analiz(request):
         if c == 0: print("OCR SONUÇ: Geçerli etiket yok."); return JsonResponse({'success': True, 'message': "Geçerli etiket bulunamadı.", 'count': 0, 'results': []})
         print(f"OCR SONUÇ: {c} geçerli etiket."); return JsonResponse({'success': True, 'message': f"✅ {c} etiket okundu.", 'count': c, 'results': processed})
 
-    except google_exceptions.GoogleAPICallError as e: if google_exceptions else Exception as e: 
-        print(f"Gemini API Hatası: {e}"); msg = f"Gemini API hatası: {e}."; return JsonResponse({'success': False, 'message': msg}, status=502) 
-    except Exception as e: et = type(e).__name__; print(f"Kritik YZ Hatası ({et}): {e}"); return JsonResponse({'success': False, 'message': f"Analiz hatası ({et})."}, status=500)
+    # --- SyntaxError Düzeltmesi ---
+    # except bloğunu doğru şekilde ayır
+    except google_exceptions.GoogleAPICallError as e: # Önce spesifik Google hatasını yakala
+        print(f"Gemini API Hatası: {e}") 
+        error_detail = str(e)
+        user_message = f"Gemini API ile iletişim hatası oluştu. Lütfen API anahtarınızı, kotanızı veya model adını kontrol edin."
+        if "API key not valid" in error_detail or "PERMISSION_DENIED" in error_detail:
+             user_message = "Gemini API anahtarı geçersiz veya yetki sorunu. Yönetici ile iletişime geçin."
+        elif "quota" in error_detail.lower() or "RESOURCE_EXHAUSTED" in error_detail:
+             user_message = "Gemini API kullanım kotası aşıldı."
+        elif "model" in error_detail.lower() and ("not found" in error_detail.lower() or "is not supported" in error_detail.lower()):
+             user_message = f"Kullanılan Gemini modeli ('{model_name}') bulunamadı veya bu işlem için desteklenmiyor."
+        # Diğer 4xx/5xx hataları için genel mesaj
+        elif hasattr(e, 'grpc_status_code'): # gRPC hatasıysa
+              user_message = f"Gemini API sunucu hatası ({e.grpc_status_code}). Lütfen tekrar deneyin."
+        return JsonResponse({'success': False, 'message': user_message}, status=502) 
+    except Exception as e: # Sonra diğer genel hataları yakala
+        error_type = type(e).__name__
+        print(f"Kritik YZ Analiz Hatası ({error_type}): {e}") 
+        return JsonResponse({'success': False, 'message': f"Görsel analizi sırasında beklenmedik sunucu hatası ({error_type})."}, status=500)
+
 
 # --- EXCEL EXPORT --- (Placeholderlar)
 @csrf_exempt
