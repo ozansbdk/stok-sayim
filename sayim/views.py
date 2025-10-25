@@ -695,8 +695,15 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             # Benzersiz ID'yi temizlenmiş verilerle oluştur
             benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
             
-            # Malzeme kaydını bulurken sadece benzersiz_id kullanıyoruz.
-            malzeme = Malzeme.objects.get(benzersiz_id=benzersiz_id) 
+            # Malzeme kaydını bulmak için: Sadece benzersiz ID yerine, 
+            # Malzeme tablosundaki 4 ana alanı kullanmak daha sağlamdır
+            malzeme = Malzeme.objects.get(
+                malzeme_kodu=stok_kod,
+                parti_no=parti_no,
+                renk=renk,
+                lokasyon_kodu=depo_kod
+            )
+            
             sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
             
             if sayim_emri.durum != 'Açık':
