@@ -560,8 +560,8 @@ def ajax_akilli_stok_ara(request):
     parti_no = standardize_id_part(request.GET.get('parti_no', 'YOK'))
     renk = standardize_id_part(request.GET.get('renk', 'YOK'))
     depo_kod = standardize_id_part(request.GET.get('depo_kod', 'YOK'))
-    barkod_ham_veri = request.GET.get('barkod_ham_veri', 'YOK')
-
+    
+    # Başlangıç verileri
     response_data = {
         'found': False,
         'urun_bilgi': 'Stok veya Barkod bulunamadı.',
@@ -572,56 +572,79 @@ def ajax_akilli_stok_ara(request):
         'sayilan_stok': '0.00',
         'last_sayim': 'Bilinmiyor',
         'parti_varyantlar': [],
-        'renk_varyantlar': []
+        'renk_varyantlar': [],
+        'farkli_depo_uyarisi': '' # Yeni uyarı alanı
     }
     
-    # Kapsamlı sorgu oluşturuluyor
-    q_objects = Q(lokasyon_kodu=depo_kod)
     malzeme = None
     
-    # 1. Tam Eşleşme ile Arama (Stok Kodu, Parti, Renk tam eşleşme)
-    if stok_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
-        benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
-        try:
-            malzeme = Malzeme.objects.get(benzersiz_id=benzersiz_id)
-        except Malzeme.DoesNotExist:
-            pass # Tam eşleşme bulunamadı, diğer arama türlerine geç
-
-    # 2. Barkod/Seri No İle Arama (Tamamlayıcı Arama)
-    if not malzeme and seri_no != 'YOK':
-        # Barkodu benzersiz_id veya malzeme_kodu içinde arıyoruz.
-        barkod_q = Q(benzersiz_id__icontains=seri_no) | Q(malzeme_kodu__icontains=seri_no)
+    # -----------------------------------------------------------
+    # 1. Seri No / Barkod ile Tam Eşleşme (En Yüksek Öncelik)
+    # -----------------------------------------------------------
+    if seri_no != 'YOK':
+        # Malzeme tablosunda benzersiz_id veya malzeme_kodu içinde arama
+        barkod_q = Q(benzersiz_id__icontains=seri_no) | Q(malzeme_kodu__iexact=seri_no)
+        # Sadece ilgili depodaki kaydı bulmaya çalış
         malzeme = Malzeme.objects.filter(barkod_q & Q(lokasyon_kodu=depo_kod)).first()
 
-    # 3. Stok Kodu ve Varyant Arama (Varyant Listesini Döndürme)
+    # -----------------------------------------------------------
+    # 2. Parti No ile Arama (Parti, Stok Kodu ve Renk ile Tam Eşleşme)
+    # -----------------------------------------------------------
+    if not malzeme and parti_no != 'YOK' and stok_kod != 'YOK' and renk != 'YOK':
+        benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
+        malzeme = Malzeme.objects.filter(benzersiz_id=benzersiz_id).first()
+
+    # -----------------------------------------------------------
+    # 3. Stok Kodu & Varyant ile Arama (Parti/Renk Seçimi Gerekir)
+    # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK':
+        
+        # Sadece Stok Koduna göre bu depodaki tüm varyantları getir
         varyantlar = Malzeme.objects.filter(
             malzeme_kodu=stok_kod,
             lokasyon_kodu=depo_kod
         ).values('parti_no', 'renk', 'sistem_stogu').distinct()
 
         if varyantlar:
-            response_data['urun_bilgi'] = f"Varyant Seçimi Gerekli: {stok_kod} için {len(varyantlar)} varyant bulundu."
-            response_data['stok_kod'] = stok_kod # Stok kodu dolu kalsın
-            response_data['parti_varyantlar'] = sorted(list(set([v['parti_no'] for v in varyantlar if v['parti_no'] != 'YOK'])))
-            response_data['renk_varyantlar'] = sorted(list(set([v['renk'] for v in varyantlar if v['renk'] != 'YOK'])))
             
-            # Eğer tek bir varyant varsa ve o seçilmişse, onu otomatik yükleyelim.
-            if len(varyantlar) == 1:
-                malzeme = Malzeme.objects.get(
+            # Eğer Stok Kodu ve Parti/Renk de girilmişse, tam eşleşmeye git
+            if parti_no != 'YOK' or renk != 'YOK':
+                final_malzeme = Malzeme.objects.filter(
                     malzeme_kodu=stok_kod,
                     lokasyon_kodu=depo_kod,
-                    parti_no=varyantlar[0]['parti_no'],
-                    renk=varyantlar[0]['renk']
-                )
-
-    # Nihai Sonuçları İşleme
+                    parti_no=parti_no,
+                    renk=renk
+                ).first()
+                if final_malzeme:
+                    malzeme = final_malzeme # Tam eşleşme bulundu
+                # Eğer bulunamazsa, varyant listesini gösterir.
+                
+            # Eğer tam eşleşme bulunamadıysa ve birden fazla varyant varsa, listeyi göster
+            if not malzeme and len(varyantlar) > 0:
+                response_data['urun_bilgi'] = f"Varyant Seçimi Gerekli: {stok_kod} için {len(varyantlar)} varyant bulundu."
+                response_data['stok_kod'] = stok_kod 
+                response_data['parti_varyantlar'] = sorted(list(set([v['parti_no'] for v in varyantlar if v['parti_no'] != 'YOK'])))
+                response_data['renk_varyantlar'] = sorted(list(set([v['renk'] for v in varyantlar if v['renk'] != 'YOK'])))
+                return JsonResponse(response_data) # Varyant seçimi listesi döndür
+    
+    # -----------------------------------------------------------
+    # NİHAİ SONUÇ İŞLEME
+    # -----------------------------------------------------------
     if malzeme:
         # Sayım Detaylarını Topla
         sayilan_miktarlar = SayimDetay.objects.filter(
             benzersiz_malzeme__benzersiz_id=malzeme.benzersiz_id
         ).aggregate(total_sayilan=Sum('sayilan_stok'))
         toplam_sayilan = sayilan_miktarlar['total_sayilan'] or 0.0
+        
+        # ⭐ YENİ ÖZELLİK: Farklı Depo Uyarısı Kontrolü
+        diger_depolar = Malzeme.objects.filter(
+            malzeme_kodu=malzeme.malzeme_kodu
+        ).exclude(lokasyon_kodu=depo_kod).values_list('lokasyon_kodu', flat=True).distinct()
+        
+        if diger_depolar.exists():
+            depo_isimleri = ", ".join(sorted(list(diger_depolar)))
+            response_data['farkli_depo_uyarisi'] = f"⚠️ DİKKAT! Bu ürünün stoğu {depo_isimleri} depolarında da mevcut."
 
         response_data.update({
             'found': True,
@@ -629,18 +652,14 @@ def ajax_akilli_stok_ara(request):
             'stok_kod': malzeme.malzeme_kodu,
             'parti_no': malzeme.parti_no,
             'renk': malzeme.renk,
-            'sistem_stok': f"{malzeme.sistem_stogu:.2f}", # <--- SİSTEM STOĞU ARTIK GÖSTERİLİYOR
+            'sistem_stok': f"{malzeme.sistem_stogu:.2f}", 
             'sayilan_stok': f"{toplam_sayilan:.2f}",
             'last_sayim': get_last_sayim_info(malzeme.benzersiz_id) or 'Yok',
-            'parti_varyantlar': [], # Tam eşleşme bulunduğunda varyantları sıfırla
+            'parti_varyantlar': [], 
             'renk_varyantlar': []
         })
         return JsonResponse(response_data)
         
-    # Eğer varyantlar bulunduysa, varyant listesini döndür.
-    if response_data['parti_varyantlar'] or response_data['renk_varyantlar']:
-        return JsonResponse(response_data)
-
 
     # Eğer hiçbir şey bulunamadıysa, varsayılan hata yanıtı
     response_data['urun_bilgi'] = f"Stok Kodu/Barkod ({seri_no or stok_kod}) '{depo_kod}' deposunda bulunamadı."
