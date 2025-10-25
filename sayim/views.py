@@ -722,7 +722,16 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             se = get_object_or_404(SayimEmri, pk=sayim_emri_id)
             if se.durum != 'Açık': print(f">> HATA: Sayım Emri ({sayim_emri_id}) kapalı."); return JsonResponse({'success': False, 'message': 'Sayım kapalı.'}, status=403) 
             print(f">> Detay Oluşturuluyor: Miktar={m}, Personel={pa}...")
-            SayimDetay.objects.create(sayim_emri=se, benzersiz_malzeme=malzeme, personel_adi=pa, sayilan_stok=m, latitude=lat, longitude=lon)
+            # --- TypeError Düzeltmesi UYGULANDI ---
+            SayimDetay.objects.create(
+                sayim_emri=se, 
+                benzersiz_malzeme=malzeme, # Sadece ilişki
+                personel_adi=pa, 
+                sayilan_stok=m, 
+                latitude=lat, # Modelde bu alanlar varsa
+                longitude=lon   # Modelde bu alanlar varsa
+                # konum_hata_mesaji alanı modelde varsa buraya eklenebilir
+            )
             print("   -> Oluşturuldu.")
             ts = SayimDetay.objects.filter(sayim_emri=se, benzersiz_malzeme=malzeme).aggregate(t=Sum('sayilan_stok'))['t'] or Decimal('0.0')
             print(f"   -> Yeni Toplam: {ts}")
@@ -745,14 +754,31 @@ def gemini_ocr_analiz(request):
         except Exception as img_err: print(f"OCR Resim Açma Hatası: {img_err}"); return JsonResponse({'success': False, 'message': f"Resim açılamadı: {img_err}"}, status=400)
         
         genai.configure(api_key=GEMINI_API_KEY) 
-        model_name = 'gemini-1.5-flash' 
+        model_name = 'gemini-1.5-flash' # Flash modeline geri döndük
         model = genai.GenerativeModel(model_name) 
         system_instruction = ("Extract 'stok_kod', 'parti_no', 'renk', 'miktar' from labels. Use 'YOK' if missing. Quantity ('miktar') as decimal (e.g., 1.0). Respond ONLY with JSON list.")
         prompt = ("Analyze labels, create JSON list with 'stok_kod', 'parti_no', 'renk', 'miktar'. Quantity as decimal.")
-        generation_config = GenerationConfig(response_mime_type="application/json", response_schema=Schema(type=Type.ARRAY, items=Schema(type=Type.OBJECT, properties={'stok_kod': Schema(type=Type.STRING), 'parti_no': Schema(type=Type.STRING), 'renk': Schema(type=Type.STRING), 'miktar': Schema(type=Type.NUMBER)}, required=['stok_kod'])))
+        
+        # --- Config'i tekrar ekledik ---
+        generation_config = GenerationConfig(
+            response_mime_type="application/json", 
+            response_schema=Schema(
+                type=Type.ARRAY, 
+                items=Schema(
+                    type=Type.OBJECT, 
+                    properties={
+                        'stok_kod': Schema(type=Type.STRING), 
+                        'parti_no': Schema(type=Type.STRING), 
+                        'renk': Schema(type=Type.STRING), 
+                        'miktar': Schema(type=Type.NUMBER)
+                    }, 
+                    required=['stok_kod']
+                )
+            )
+        )
         
         print(f"Gemini API Çağrısı: Model={model_name}")
-        response = model.generate_content([prompt, img], generation_config=generation_config)
+        response = model.generate_content([prompt, img], generation_config=generation_config) # Config ile çağır
         print("Gemini Yanıtı Alındı.")
         
         try:
@@ -780,22 +806,27 @@ def gemini_ocr_analiz(request):
         if c == 0: print("OCR SONUÇ: Geçerli etiket yok."); return JsonResponse({'success': True, 'message': "Geçerli etiket bulunamadı.", 'count': 0, 'results': []})
         print(f"OCR SONUÇ: {c} geçerli etiket."); return JsonResponse({'success': True, 'message': f"✅ {c} etiket okundu.", 'count': c, 'results': processed})
 
-    # --- SyntaxError Düzeltmesi ---
+    # --- SyntaxError Düzeltmesi UYGULANDI ---
     # except bloğunu doğru şekilde ayır
-    except google_exceptions.GoogleAPICallError as e: # Önce spesifik Google hatasını yakala
+    except google_exceptions.GoogleAPICallError as e: # Önce spesifik Google hatasını yakala (google_exceptions import edildi)
         print(f"Gemini API Hatası: {e}") 
         error_detail = str(e)
+        # Kullanıcıya daha anlamlı mesajlar ver
         user_message = f"Gemini API ile iletişim hatası oluştu. Lütfen API anahtarınızı, kotanızı veya model adını kontrol edin."
-        if "API key not valid" in error_detail or "PERMISSION_DENIED" in error_detail:
+        # Hata tiplerini daha doğru kontrol et (varsa)
+        if isinstance(e, google_exceptions.PermissionDenied) or "API key not valid" in error_detail:
              user_message = "Gemini API anahtarı geçersiz veya yetki sorunu. Yönetici ile iletişime geçin."
-        elif "quota" in error_detail.lower() or "RESOURCE_EXHAUSTED" in error_detail:
+        elif isinstance(e, google_exceptions.ResourceExhausted) or "quota" in error_detail.lower():
              user_message = "Gemini API kullanım kotası aşıldı."
-        elif "model" in error_detail.lower() and ("not found" in error_detail.lower() or "is not supported" in error_detail.lower()):
+        elif isinstance(e, google_exceptions.NotFound) or ("model" in error_detail.lower() and ("not found" in error_detail.lower() or "is not supported" in error_detail.lower())):
              user_message = f"Kullanılan Gemini modeli ('{model_name}') bulunamadı veya bu işlem için desteklenmiyor."
-        # Diğer 4xx/5xx hataları için genel mesaj
-        elif hasattr(e, 'grpc_status_code'): # gRPC hatasıysa
-              user_message = f"Gemini API sunucu hatası ({e.grpc_status_code}). Lütfen tekrar deneyin."
-        return JsonResponse({'success': False, 'message': user_message}, status=502) 
+        elif isinstance(e, google_exceptions.InvalidArgument):
+             user_message = f"Gemini API'ye geçersiz bir argüman gönderildi: {e}"
+        # Diğer 4xx/5xx hataları
+        elif hasattr(e, 'message'): # Genel Google API hatası
+            user_message = f"Gemini API Hatası: {e.message}"
+             
+        return JsonResponse({'success': False, 'message': user_message}, status=502) # Bad Gateway daha uygun
     except Exception as e: # Sonra diğer genel hataları yakala
         error_type = type(e).__name__
         print(f"Kritik YZ Analiz Hatası ({error_type}): {e}") 
