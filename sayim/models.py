@@ -1,5 +1,6 @@
 from django.db import models
-from django.utils import timezone 
+from django.utils import timezone
+from decimal import Decimal # DecimalField için eklendi
 
 # --- MERKEZİ ID TEMİZLEME VE OLUŞTURMA FONKSİYONLARI ---
 
@@ -33,9 +34,9 @@ class Malzeme(models.Model):
     seri_no = models.CharField(max_length=100, null=True, blank=True, default='YOK', db_index=True)
     
     # Stok Tanımlama Alanları
-    malzeme_kodu = models.CharField(max_length=100)
-    parti_no = models.CharField(max_length=100, null=True, blank=True, default='YOK')
-    lokasyon_kodu = models.CharField(max_length=100, default='YOK')
+    malzeme_kodu = models.CharField(max_length=100, db_index=True) # Arama için index eklendi
+    parti_no = models.CharField(max_length=100, null=True, blank=True, default='YOK', db_index=True) # Arama için index eklendi
+    lokasyon_kodu = models.CharField(max_length=100, default='YOK', db_index=True) # Arama için index eklendi
     renk = models.CharField(max_length=50, null=True, blank=True, default='YOK')
     
     # Açıklayıcı Alanlar
@@ -47,9 +48,10 @@ class Malzeme(models.Model):
     olcu_birimi = models.CharField(max_length=20)
     
     # Stok/Finansal Alanlar
-    sistem_stogu = models.FloatField(default=0.0)
-    sistem_tutari = models.FloatField(default=0.0)
-    birim_fiyat = models.FloatField(default=0.0)
+    # ⭐ DÜZELTME 1: FloatField -> DecimalField olarak değiştirildi
+    sistem_stogu = models.DecimalField(max_digits=19, decimal_places=5, default=Decimal('0.0'))
+    sistem_tutari = models.DecimalField(max_digits=19, decimal_places=5, default=Decimal('0.0'))
+    birim_fiyat = models.DecimalField(max_digits=19, decimal_places=5, default=Decimal('0.0'))
 
     class Meta:
         verbose_name = "Malzeme"
@@ -66,6 +68,13 @@ class Malzeme(models.Model):
             self.lokasyon_kodu, 
             self.renk
         )
+        # ⭐ DÜZELTME 1.1: Sistem tutarını da otomatik hesapla (opsiyonel ama önerilir)
+        if isinstance(self.sistem_stogu, (int, float, str)):
+             self.sistem_stogu = Decimal(str(self.sistem_stogu))
+        if isinstance(self.birim_fiyat, (int, float, str)):
+             self.birim_fiyat = Decimal(str(self.birim_fiyat))
+             
+        self.sistem_tutari = self.sistem_stogu * self.birim_fiyat
         super().save(*args, **kwargs)
 
 # --- SAYIM YÖNETİM MODELLERİ ---
@@ -99,18 +108,19 @@ class SayimEmri(models.Model):
 
 
 class SayimDetay(models.Model):
-    sayim_emri = models.ForeignKey(SayimEmri, on_delete=models.CASCADE)
+    sayim_emri = models.ForeignKey(SayimEmri, on_delete=models.CASCADE, related_name="detaylar")
 
     # Personelin bir önceki kaydı ile arasındaki zamanı hesaplamak için kullanılır
     guncellenme_tarihi = models.DateTimeField(auto_now=True) 
     
     # Malzeme modeline Foreign Key bağlantısı (Benzersiz ID'yi temsil eder)
-    benzersiz_malzeme = models.ForeignKey(Malzeme, on_delete=models.CASCADE) 
+    benzersiz_malzeme = models.ForeignKey(Malzeme, on_delete=models.CASCADE, related_name="sayim_detaylari") 
     
-    sayilan_stok = models.FloatField()
+    # ⭐ DÜZELTME 1: FloatField -> DecimalField olarak değiştirildi
+    sayilan_stok = models.DecimalField(max_digits=19, decimal_places=5)
     kayit_tarihi = models.DateTimeField(default=timezone.now)
-    personel_adi = models.CharField(max_length=100)
-    saniye_stamp = models.FloatField(default=0.0)
+    personel_adi = models.CharField(max_length=100, db_index=True) # Analiz için index eklendi
+    saniye_stamp = models.FloatField(default=0.0) # Bu muhtemelen kullanılmıyor, kaldırılabilir
 
     # ⭐ YENİ EKLENEN KONUM ALANLARI
     latitude = models.CharField(max_length=50, default='YOK', blank=True, null=True)
@@ -120,8 +130,12 @@ class SayimDetay(models.Model):
     class Meta:
         verbose_name = "Sayım Detay"
         verbose_name_plural = "Sayım Detayları"
-        # Bir sayım emrinde aynı malzemeden (benzersiz_malzeme) birden fazla sayım kaydı olmaması için
-        unique_together = (('sayim_emri', 'benzersiz_malzeme'),)
+        
+        # ⭐ DÜZELTME 2: 'unique_together' kaldırıldı.
+        # Bu kısıtlama, bir malzemeyi birden fazla kez saymanızı engelliyordu.
+        # unique_together = (('sayim_emri', 'benzersiz_malzeme'),) # BU SATIR KALDIRILDI
 
     def __str__(self):
-        return f"{self.benzersiz_malzeme.malzeme_kodu} - {self.sayilan_stok} sayıldı"
+        # İlişkili malzeme silinmişse hata vermemesi için kontrol
+        malzeme_kodu = self.benzersiz_malzeme.malzeme_kodu if self.benzersiz_malzeme else "SİLİNMİŞ MALZEME"
+        return f"{malzeme_kodu} - {self.sayilan_stok} sayıldı"
