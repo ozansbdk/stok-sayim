@@ -68,7 +68,7 @@ class PersonelLoginView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['sayim_emri_id'] = kwargs['sayim_emri_id']
+        context['sayim_emri_id'] = self.object.pk
         context['depo_kodu'] = kwargs['depo_kodu']
         context['sayim_emri'] = get_object_or_404(SayimEmri, pk=kwargs['sayim_emri_id'])
         return context
