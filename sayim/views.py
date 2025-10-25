@@ -6,8 +6,8 @@ import os
 from datetime import datetime
 from io import BytesIO
 import base64
-from io import BytesIO as IO_Bytes 
-from decimal import Decimal 
+from io import BytesIO as IO_Bytes
+from decimal import Decimal
 
 # Django Imports
 from django.shortcuts import render, redirect, get_object_or_404
@@ -19,11 +19,13 @@ from django.views.generic import ListView, CreateView, DetailView, TemplateView
 from django.urls import reverse_lazy
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection, transaction
-from django.db.models import Max, F, Sum, Q 
+from django.db.models import Max, F, Sum, Q
 from django.utils import timezone
-from django.utils.translation import gettext as _ 
+from django.utils.translation import gettext as _
 from django.core.management import call_command
 from django.contrib import messages
+from django.utils.text import slugify
+
 # from django.contrib.auth import get_user_model # Kaldırılmıştı
 
 # Third-party Imports
@@ -37,12 +39,12 @@ from google.genai.errors import APIError
 
 # Local Imports
 # NOT: Bu importları kendi model isimlerinizle eşleştirin!
-from .models import SayimEmri, Malzeme, SayimDetay, standardize_id_part, generate_unique_id 
+from .models import SayimEmri, Malzeme, SayimDetay, standardize_id_part, generate_unique_id
 from .forms import SayimGirisForm
 
 # --- SABİTLER ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_AVAILABLE = bool(GEMINI_API_KEY) 
+GEMINI_AVAILABLE = bool(GEMINI_API_KEY)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # --- GÖRÜNÜMLER (VIEWS) ---
@@ -55,7 +57,7 @@ class SayimEmirleriListView(ListView):
 
 class SayimEmriCreateView(CreateView):
     model = SayimEmri
-    fields = ['ad', 'atanan_personel'] 
+    fields = ['ad', 'atanan_personel']
     template_name = 'sayim/sayim_emri_olustur.html'
     success_url = reverse_lazy('sayim_emirleri')
 
@@ -64,13 +66,30 @@ class SayimEmriCreateView(CreateView):
         return super().form_valid(form)
 
 class PersonelLoginView(TemplateView):
+    """
+    Personel giriş ekranı. TemplateView olduğu için self.object kullanmaz.
+    URL'den gelen sayim_emri_id'yi kullanarak SayimEmri nesnesini getirir.
+    """
     template_name = 'sayim/personel_login.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['sayim_emri_id'] = self.object.pk
-        context['depo_kodu'] = kwargs['depo_kodu']
-        context['sayim_emri'] = get_object_or_404(SayimEmri, pk=kwargs['sayim_emri_id'])
+
+        # URL parametrelerini al
+        sayim_emri_id = self.kwargs.get('sayim_emri_id')
+        depo_kodu = self.kwargs.get('depo_kodu')
+
+        # Sayım Emri nesnesini getir (TemplateView'da self.object yoktur, bu yüzden manuel getiriyoruz)
+        # Bu nesne, şablonda Sayım Emri bilgilerini göstermek için gereklidir.
+        sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
+
+        # Hatanın kaynağı olan self.object.pk kullanımı yerine doğrudan nesneyi kullanıyoruz.
+        context.update({
+            'sayim_emri_id': sayim_emri.pk, # Doğrudan nesnenin pk'sını kullanmak daha güvenlidir.
+            'depo_kodu': depo_kodu,
+            'sayim_emri': sayim_emri
+        })
+
         return context
 
 @csrf_exempt
@@ -85,11 +104,11 @@ def set_personel_session(request):
              messages.error(request, "Lütfen adınızı girin.")
              return redirect('personel_login', sayim_emri_id=sayim_emri_id, depo_kodu=depo_kodu)
 
-        personel_adi = personel_adi_raw.upper() 
+        personel_adi = personel_adi_raw.upper()
         
         # ⭐ Sayım Emri ID'sinin tamsayı olduğundan emin ol (NoReverseMatch çözümü için KRİTİK).
         try:
-             sayim_emri_id_int = int(sayim_emri_id) 
+             sayim_emri_id_int = int(sayim_emri_id)
         except (ValueError, TypeError):
              messages.error(request, "Sayım Emri ID'si geçersiz formatta.")
              return redirect('sayim_emirleri')
@@ -137,7 +156,7 @@ class SayimGirisView(DetailView):
     
     # URL'de bulunan depo_kodu parametresini DetailView'ın aramasını engelliyoruz.
     slug_url_kwarg = 'depo_kodu'
-    slug_field = None 
+    slug_field = None
     
     def get_object(self, queryset=None):
         # Sayım Emri objesini bulmak için sadece 'sayim_emri_id' parametresini kullanır.
@@ -149,7 +168,7 @@ class SayimGirisView(DetailView):
             queryset = self.get_queryset()
             
         try:
-            return queryset.get(pk=pk) 
+            return queryset.get(pk=pk)
         except self.model.DoesNotExist:
             raise Http404("Sayım Emri bulunamadı.")
 
@@ -157,7 +176,7 @@ class SayimGirisView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Eğer Sayım Emri başarılı bulunduysa, pk değeri mevcuttur.
-        context['depo_kodu'] = self.kwargs['depo_kodu'] 
+        context['depo_kodu'] = self.kwargs['depo_kodu']
         context['personel_adi'] = self.request.session.get('current_user', 'MISAFIR')
         context['gemini_available'] = GEMINI_AVAILABLE
         context['form'] = SayimGirisForm()
@@ -266,9 +285,9 @@ class PerformansAnaliziView(DetailView):
             analiz_list.sort(key=lambda x: x['ortalama_sure_sn'])
             for item in analiz_list:
                 if item['ortalama_sure_sn'] == float('inf'):
-                    item['ortalama_sure_sn'] = '0.00'
+                     item['ortalama_sure_sn'] = '0.00'
                 else:
-                    item['ortalama_sure_sn'] = f"{item['ortalama_sure_sn']:.2f}"
+                     item['ortalama_sure_sn'] = f"{item['ortalama_sure_sn']:.2f}"
             context['analiz_data'] = analiz_list
         except Exception as e:
             context['analiz_data'] = []
@@ -343,7 +362,7 @@ class KonumAnaliziView(DetailView):
         konum_data = SayimDetay.objects.filter(
             sayim_emri=sayim_emri,
             latitude__isnull=False,
-            latitude__icontains='.', 
+            latitude__icontains='.',
             longitude__isnull=False,
             longitude__icontains='.'
         ).exclude(latitude='YOK').exclude(longitude='YOK').values(
@@ -420,7 +439,7 @@ def stoklari_onayla_ve_kapat(request, pk):
 def yonetim_araclari(request):
     """Veri temizleme ve yükleme araçları sayfasını gösterir."""
     # Orijinal HTML dosyasını göster
-    return render(request, 'sayim/yonetim.html', {}) 
+    return render(request, 'sayim/yonetim.html', {})
 
 @csrf_exempt
 @transaction.atomic
@@ -471,9 +490,9 @@ def upload_and_reload_stok_data(request):
                          # KULLANILAN BAŞLIKLAR: "Stok Kodu", "Parti", "Renk", "Depo Kodu", "Miktar", "Maliyet birim", "Grup", "Stok Adı", "Birim"
                          
                          stok_kod = standardize_id_part(row.get('Stok Kodu', 'YOK'))
-                         parti_no = standardize_id_part(row.get('Parti', 'YOK')) 
+                         parti_no = standardize_id_part(row.get('Parti', 'YOK'))
                          renk = standardize_id_part(row.get('Renk', 'YOK'))
-                         lokasyon_kodu = standardize_id_part(row.get('Depo Kodu', 'MERKEZ')) 
+                         lokasyon_kodu = standardize_id_part(row.get('Depo Kodu', 'MERKEZ'))
                          
                          if stok_kod == 'YOK':
                              fail_count += 1
@@ -482,9 +501,9 @@ def upload_and_reload_stok_data(request):
                          benzersiz_id = generate_unique_id(stok_kod, parti_no, lokasyon_kodu, renk)
 
                          # VERİ EŞLEME KISMI
-                         sistem_miktari = float(row.get('Miktar', 0.0) or 0.0) 
-                         birim_fiyati = float(row.get('Maliyet birim', 0.0) or 0.0) 
-                         stok_grubu = row.get('Grup', 'GENEL') 
+                         sistem_miktari = float(row.get('Miktar', 0.0) or 0.0)
+                         birim_fiyati = float(row.get('Maliyet birim', 0.0) or 0.0)
+                         stok_grubu = row.get('Grup', 'GENEL')
                          stok_adi = row.get('Stok Adı', f"Stok {stok_kod}")
                          birim = row.get('Birim', 'ADET')
                          
@@ -500,7 +519,7 @@ def upload_and_reload_stok_data(request):
                                  'stok_grup': stok_grubu,
                                  'sistem_stogu': sistem_miktari,
                                  'birim_fiyat': birim_fiyati,
-                                 'sistem_tutari': sistem_miktari * birim_fiyati 
+                                 'sistem_tutari': sistem_miktari * birim_fiyati
                              }
                          )
                          success_count += 1

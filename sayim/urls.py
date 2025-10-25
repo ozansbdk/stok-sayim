@@ -43,14 +43,14 @@ urlpatterns = [
     path('reset-sayim-data/', reset_sayim_data, name='reset_sayim_data'),
 
     # Excel Yükleme ve İndirme
-    path('upload-stok-excel/', upload_and_reload_stok_data, name='upload_stok_excel'), 
+    path('upload-stok-excel/', upload_and_reload_stok_data, name='upload_stok_excel'),
     path('export/excel/<int:sayim_emri_id>/', export_excel, name='export_excel'),
     path('export/mutabakat-excel/<int:sayim_emri_id>/', export_mutabakat_excel, name='export_mutabakat_excel'),
     
     # 5. AJAX Endpoints
     path('ajax/akilli-stok-ara/', ajax_akilli_stok_ara, name='ajax_akilli_stok_ara'),
     # AJAX SAYIM KAYDETME (sayim_emri_id parametresini bekliyor)
-    path('ajax/sayim-kaydet/<int:sayim_emri_id>/', ajax_sayim_kaydet, name='ajax_sayim_kaydet'), 
+    path('ajax/sayim-kaydet/<int:sayim_emri_id>/', ajax_sayim_kaydet, name='ajax_sayim_kaydet'),
     
     path('ajax/ocr-analiz/', gemini_ocr_analiz, name='gemini_ocr_analiz'),
 ]
