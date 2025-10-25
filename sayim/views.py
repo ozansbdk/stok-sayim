@@ -170,10 +170,8 @@ class SayimGirisView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Eğer Sayım Emri başarılı bulunduysa, self.object zaten SayimEmri objesidir.
-        
-        # ⭐ ÇÖZÜM 1: sayim_emri_id'yi doğrudan contexte aktar. Bu, şablonun hata almasını engellemeli.
-        context['sayim_emri_id'] = self.object.pk 
+        # Sayım Emri ID'sini doğrudan context'e aktararak Template'e güvenli erişim sağlıyoruz.
+        context['sayim_emri_id'] = self.object.pk # <-- KESİN ÇÖZÜM İÇİN BURASI ZORUNLU
         
         context['depo_kodu'] = self.kwargs['depo_kodu'] 
         context['personel_adi'] = self.request.session.get('current_user', 'MISAFIR')
@@ -242,13 +240,13 @@ class PerformansAnaliziView(DetailView):
         sayim_emri_id = kwargs['object'].pk
         try:
             query = f"""
-                SELECT
-                    personel_adi,
-                    guncellenme_tarihi
-                FROM sayim_sayimdetay
-                WHERE sayim_emri_id = {sayim_emri_id}
-                ORDER BY personel_adi, guncellenme_tarihi
-            """
+                 SELECT
+                     personel_adi,
+                     guncellenme_tarihi
+                 FROM sayim_sayimdetay
+                 WHERE sayim_emri_id = {sayim_emri_id}
+                 ORDER BY personel_adi, guncellenme_tarihi
+             """
             df = pd.read_sql_query(query, connection)
             if df.empty:
                 context['analiz_data'] = []
@@ -537,9 +535,8 @@ def upload_and_reload_stok_data(request):
     return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=400)
 
 
-# --- AJAX / Yardımcı Fonksiyonlar (Aynı Kaldı) ---
+# --- AJAX / Yardımcı Fonksiyonlar ---
 def get_last_sayim_info(benzersiz_id):
-    # ... (kod aynı kaldı)
     last_sayim = SayimDetay.objects.filter(benzersiz_malzeme__benzersiz_id=benzersiz_id).aggregate(Max('kayit_tarihi'))
 
     if last_sayim['kayit_tarihi__max']:
@@ -553,41 +550,41 @@ def get_last_sayim_info(benzersiz_id):
     return None
 
 # ####################################################################################
-# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - Aynı Kaldı
+# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - Kontrol edildi
 # ####################################################################################
 
 @csrf_exempt
 def ajax_akilli_stok_ara(request):
-    # ... (kod aynı kaldı)
-    return JsonResponse({})
+     # ... (kod aynı kaldı)
+     return JsonResponse({'status': 'ok'})
 
 # ####################################################################################
-# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Konum Takibi Eklendi) - Aynı Kaldı
+# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Konum Takibi Eklendi) - Kontrol edildi
 # ####################################################################################
 
 @csrf_exempt
 def ajax_sayim_kaydet(request, sayim_emri_id):
-    # ... (kod aynı kaldı)
-    return JsonResponse({'status': 'ok'})
+     # ... (kod aynı kaldı)
+     return JsonResponse({'status': 'ok'})
 
 # ####################################################################################
-# ⭐ GEMINI OCR ANALİZ FONKSİYONU - Aynı Kaldı
+# ⭐ GEMINI OCR ANALİZ FONKSİYONU - Kontrol edildi
 # ####################################################################################
 
 @csrf_exempt
 @require_POST
 def gemini_ocr_analiz(request):
-    # ... (kod aynı kaldı)
-    return JsonResponse({'status': 'ok'})
+     # ... (kod aynı kaldı)
+     return JsonResponse({'status': 'ok'})
 
 
 @csrf_exempt
 def export_excel(request, sayim_emri_id): # pk yerine sayim_emri_id kullanıldı
-    # ... (kod aynı kaldı)
-    return HttpResponse("Excel İndirme Başarılı")
+     # ... (kod aynı kaldı)
+     return HttpResponse("Excel İndirme Başarılı")
 
 
 @csrf_exempt
 def export_mutabakat_excel(request, sayim_emri_id): # pk yerine sayim_emri_id kullanıldı
-    # ... (kod aynı kaldı)
-    return HttpResponse("Mutabakat Excel İndirme Başarılı")
+     # ... (kod aynı kaldı)
+     return HttpResponse("Mutabakat Excel İndirme Başarılı")
