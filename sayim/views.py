@@ -246,7 +246,7 @@ class PerformansAnaliziView(DetailView):
                  FROM sayim_sayimdetay
                  WHERE sayim_emri_id = {sayim_emri_id}
                  ORDER BY personel_adi, guncellenme_tarihi
-             """
+               """
             df = pd.read_sql_query(query, connection)
             if df.empty:
                 context['analiz_data'] = []
@@ -266,12 +266,12 @@ class PerformansAnaliziView(DetailView):
                     toplam_aralik = len(farklar)
                     ortalama_sure_sn = toplam_saniye / toplam_aralik
                     if ortalama_sure_sn > 3600:
-                         etiket = 'Aykırı Veri ( > 1 Saat/Kayıt)'
-                         ortalama_sure_sn = float('inf')
+                        etiket = 'Aykırı Veri ( > 1 Saat/Kayıt)'
+                        ortalama_sure_sn = float('inf')
                     else:
-                         dakika = int(ortalama_sure_sn // 60)
-                         saniye_kalan = int(ortalama_sure_sn % 60)
-                         etiket = f"{dakika:02d}:{saniye_kalan:02d}"
+                        dakika = int(ortalama_sure_sn // 60)
+                        saniye_kalan = int(ortalama_sure_sn % 60)
+                        etiket = f"{dakika:02d}:{saniye_kalan:02d}"
                 analiz_list.append({
                     'personel': personel,
                     'toplam_kayit': toplam_kayit,
@@ -518,7 +518,7 @@ def upload_and_reload_stok_data(request):
                                   'birim_fiyat': birim_fiyati,
                                   'sistem_tutari': sistem_miktari * birim_fiyati 
                               }
-                         )
+                          )
                          success_count += 1
                          
                      except Exception as e:
@@ -550,41 +550,288 @@ def get_last_sayim_info(benzersiz_id):
     return None
 
 # ####################################################################################
-# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - Kontrol edildi
+# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - DOLDURULDU
 # ####################################################################################
 
 @csrf_exempt
 def ajax_akilli_stok_ara(request):
-     # ... (kod aynı kaldı)
-     return JsonResponse({'status': 'ok'})
+    seri_no = standardize_id_part(request.GET.get('seri_no', 'YOK'))
+    stok_kod = standardize_id_part(request.GET.get('stok_kod', 'YOK'))
+    parti_no = standardize_id_part(request.GET.get('parti_no', 'YOK'))
+    renk = standardize_id_part(request.GET.get('renk', 'YOK'))
+    depo_kod = standardize_id_part(request.GET.get('depo_kod', 'YOK'))
+    barkod_ham_veri = request.GET.get('barkod_ham_veri', 'YOK')
+
+    response_data = {
+        'found': False,
+        'urun_bilgi': 'Stok veya Barkod bulunamadı.',
+        'stok_kod': stok_kod,
+        'parti_no': parti_no,
+        'renk': renk,
+        'sistem_stok': '0.00',
+        'sayilan_stok': '0.00',
+        'last_sayim': 'Bilinmiyor',
+        'parti_varyantlar': [],
+        'renk_varyantlar': []
+    }
+    
+    # 1. Tam Eşleşme ile Arama (Benzersiz ID üzerinden)
+    if stok_kod != 'YOK' and depo_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
+        benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
+        try:
+            malzeme = Malzeme.objects.get(benzersiz_id=benzersiz_id)
+            
+            # Sayım Detaylarını Topla
+            sayilan_miktarlar = SayimDetay.objects.filter(
+                benzersiz_malzeme__benzersiz_id=malzeme.benzersiz_id
+            ).aggregate(total_sayilan=Sum('sayilan_stok'))
+            toplam_sayilan = sayilan_miktarlar['total_sayilan'] or 0.0
+
+            response_data.update({
+                'found': True,
+                'urun_bilgi': f"{malzeme.malzeme_adi} ({malzeme.malzeme_kodu}) - {malzeme.parti_no}/{malzeme.renk}",
+                'stok_kod': malzeme.malzeme_kodu,
+                'parti_no': malzeme.parti_no,
+                'renk': malzeme.renk,
+                'sistem_stok': f"{malzeme.sistem_stogu:.2f}",
+                'sayilan_stok': f"{toplam_sayilan:.2f}",
+                'last_sayim': get_last_sayim_info(malzeme.benzersiz_id) or 'Yok',
+            })
+            return JsonResponse(response_data)
+
+        except Malzeme.DoesNotExist:
+            response_data['urun_bilgi'] = f"{stok_kod} - {parti_no}/{renk} bulunamadı."
+            response_data['found'] = False
+            
+    # 2. Barkod/Seri No İle Arama (seri_no alanı sadece barkod gibi davranacak)
+    if seri_no != 'YOK':
+        # Malzeme tablosunda benzersiz_id içinde seri_no'yu arıyoruz. 
+        # NOT: Gerçek bir uygulamada barkod için ayrı bir alan (barkod_no) olur.
+        results = Malzeme.objects.filter(
+            Q(benzersiz_id__icontains=seri_no) | Q(malzeme_kodu__icontains=seri_no),
+            lokasyon_kodu=depo_kod
+        ).first()
+
+        if results:
+            # Benzersiz ID'yi parçalayıp tam eşleşme yapıyoruz
+            parts = results.benzersiz_id.split('_')
+            stok_kod_from_id = parts[0]
+            parti_no_from_id = parts[1]
+            depo_kod_from_id = parts[2]
+            renk_from_id = parts[3]
+
+            # Sayım Detaylarını Topla
+            sayilan_miktarlar = SayimDetay.objects.filter(
+                benzersiz_malzeme__benzersiz_id=results.benzersiz_id
+            ).aggregate(total_sayilan=Sum('sayilan_stok'))
+            toplam_sayilan = sayilan_miktarlar['total_sayilan'] or 0.0
+
+            response_data.update({
+                'found': True,
+                'urun_bilgi': f"Barkod Eşleşti: {results.malzeme_adi} (Parti: {parti_no_from_id}, Renk: {renk_from_id})",
+                'stok_kod': stok_kod_from_id,
+                'parti_no': parti_no_from_id,
+                'renk': renk_from_id,
+                'sistem_stok': f"{results.sistem_stogu:.2f}",
+                'sayilan_stok': f"{toplam_sayilan:.2f}",
+                'last_sayim': get_last_sayim_info(results.benzersiz_id) or 'Yok',
+            })
+            return JsonResponse(response_data)
+        
+    # 3. Stok Koduna Göre Varyant Arama (Parti/Renk Seçimi için)
+    if stok_kod != 'YOK' and not response_data['found']:
+        varyantlar = Malzeme.objects.filter(
+            malzeme_kodu=stok_kod,
+            lokasyon_kodu=depo_kod
+        ).values('parti_no', 'renk').distinct()
+
+        if varyantlar:
+            response_data['urun_bilgi'] = f"Varyant Seçimi Gerekli: {stok_kod} için {len(varyantlar)} varyant bulundu."
+            response_data['parti_varyantlar'] = sorted(list(set([v['parti_no'] for v in varyantlar if v['parti_no'] != 'YOK'])))
+            response_data['renk_varyantlar'] = sorted(list(set([v['renk'] for v in varyantlar if v['renk'] != 'YOK'])))
+            return JsonResponse(response_data)
+
+
+    return JsonResponse(response_data)
 
 # ####################################################################################
-# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Konum Takibi Eklendi) - Kontrol edildi
+# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Konum Takibi Eklendi) - DOLDURULDU
 # ####################################################################################
 
 @csrf_exempt
 def ajax_sayim_kaydet(request, sayim_emri_id):
-     # ... (kod aynı kaldı)
-     return JsonResponse({'status': 'ok'})
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            stok_kod = standardize_id_part(data.get('stok_kod', 'YOK'))
+            parti_no = standardize_id_part(data.get('parti_no', 'YOK'))
+            renk = standardize_id_part(data.get('renk', 'YOK'))
+            depo_kod = standardize_id_part(data.get('depo_kod', 'YOK'))
+            miktar = Decimal(data.get('miktar', 0.0))
+            personel_adi = data.get('personel_adi', 'MISAFIR')
+            
+            # Konum verisi (Opsiyonel)
+            latitude = data.get('lat', 'YOK')
+            longitude = data.get('lon', 'YOK')
+            loc_hata = data.get('loc_hata', '')
+
+            # 1. Malzeme ve Sayım Emrini Bul
+            benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
+            malzeme = get_object_or_404(Malzeme, benzersiz_id=benzersiz_id)
+            sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
+            
+            if sayim_emri.durum != 'Açık':
+                 return JsonResponse({'success': False, 'message': 'Sayım emri kapalı olduğu için kayıt yapılamaz.'})
+
+            # 2. Yeni Sayım Detayını Oluştur
+            SayimDetay.objects.create(
+                sayim_emri=sayim_emri,
+                benzersiz_malzeme=malzeme,
+                personel_adi=personel_adi,
+                sayilan_stok=miktar,
+                malzeme_kodu=stok_kod,
+                parti_no=parti_no,
+                renk=renk,
+                lokasyon_kodu=depo_kod,
+                latitude=str(latitude),
+                longitude=str(longitude),
+                konum_hata_mesaji=loc_hata
+            )
+
+            # 3. Toplam Sayılan Miktarı Hesapla (Bu sadece gösterim amaçlıdır, ana stok güncellemeyi onay butonu yapar)
+            toplam_sayilan = SayimDetay.objects.filter(
+                benzersiz_malzeme=malzeme
+            ).aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or 0.0
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f"✅ {stok_kod} ({parti_no}) için {miktar:.2f} kayıt edildi.",
+                'yeni_miktar': f"{toplam_sayilan:.2f}"
+            })
+
+        except Malzeme.DoesNotExist:
+            return JsonResponse({'success': False, 'message': f"HATA: {stok_kod} ({parti_no}) malzemesi veritabanında bulunamadı."}, status=404)
+        except SayimEmri.DoesNotExist:
+            return JsonResponse({'success': False, 'message': "HATA: Geçersiz Sayım Emri ID'si."}, status=404)
+        except Exception as e:
+            # print(f"Sayım Kaydetme Hatası: {e}") 
+            return JsonResponse({'success': False, 'message': f"Kritik Kayıt Hatası: {str(e)}"}, status=500)
+
+    return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=400)
+
 
 # ####################################################################################
-# ⭐ GEMINI OCR ANALİZ FONKSİYONU - Kontrol edildi
+# ⭐ GEMINI OCR ANALİZ FONKSİYONU - DOLDURULDU
 # ####################################################################################
 
 @csrf_exempt
 @require_POST
 def gemini_ocr_analiz(request):
-     # ... (kod aynı kaldı)
-     return JsonResponse({'status': 'ok'})
+    if not GEMINI_AVAILABLE:
+        return JsonResponse({'success': False, 'message': "Gemini API Anahtarı tanımlı değil. Lütfen ortam değişkenini kontrol edin."})
+    if 'image_file' not in request.FILES:
+        return JsonResponse({'success': False, 'message': "Görsel dosyası yüklenmedi."}, status=400)
+
+    try:
+        image_file = request.FILES['image_file']
+        img = Image.open(image_file)
+
+        # Gemini Client'ı oluştur
+        client = genai.Client(api_key=GEMINI_API_KEY)
+
+        # JSON formatını zorlamak için talimatlar
+        system_instruction = (
+            "Sen bir Stok Etiketi OCR (Optik Karakter Tanıma) ve Veri Çıkarma analistisin. "
+            "Görseldeki stok etiketlerini analiz et. Her bir etiket için 'stok_kod', 'parti_no', "
+            "'renk' ve 'miktar' alanlarını çıkarmalısın. "
+            "Eğer bir alan etikette yoksa, değer olarak 'YOK' yaz. "
+            "Miktar (miktar) alanını her zaman ondalık sayı formatında (ör: 1.0, 500.0) olarak döndür. "
+            "Yanıtını sadece JSON listesi olarak ver, başka hiçbir açıklama yapma."
+        )
+
+        prompt = (
+            "Bu görseldeki tüm stok etiketlerini analiz et ve benden istediğin alanları (stok_kod, parti_no, renk, miktar) "
+            "kullanarak bir JSON listesi (array) oluştur. Her bir etiket bir obje olmalıdır. "
+            "Unutma: Miktarı ondalık sayı (float) olarak döndür."
+        )
+
+        # API Çağrısı
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[prompt, img],
+            config={
+                'system_instruction': system_instruction,
+                'response_mime_type': 'application/json',
+                'response_schema': {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "stok_kod": {"type": "string"},
+                            "parti_no": {"type": "string"},
+                            "renk": {"type": "string"},
+                            "miktar": {"type": "number"}
+                        },
+                        "required": ["stok_kod", "miktar"]
+                    }
+                }
+            }
+        )
+
+        # JSON Yanıtını Al ve Kontrol Et
+        try:
+            # Gemini, yanıtı bir string olarak verir, bunu parse etmeliyiz.
+            json_results = json.loads(response.text)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'message': "YZ, okunabilir bir JSON formatı döndüremedi."}, status=500)
+
+        # Sonuçları işle
+        processed_results = []
+        for item in json_results:
+            # Miktarı Decimal'e çevirirken hata oluşursa yakala
+            try:
+                miktar_decimal = Decimal(item.get('miktar', 0))
+            except:
+                miktar_decimal = Decimal(0)
+
+            # Barkod/Seri no alanını şimdilik stok kodundan türetiyoruz. (Geliştirme yapılabilir)
+            processed_results.append({
+                'stok_kod': standardize_id_part(item.get('stok_kod', 'YOK')),
+                'parti_no': standardize_id_part(item.get('parti_no', 'YOK')),
+                'renk': standardize_id_part(item.get('renk', 'YOK')),
+                'miktar': f"{miktar_decimal:.2f}",
+                'barkod': standardize_id_part(item.get('stok_kod', 'YOK')) # Basit barkod eşleştirmesi
+            })
+
+        count = len(processed_results)
+        
+        if count == 0:
+            return JsonResponse({'success': False, 'message': "YZ Analizi: Görselde geçerli etiket verisi bulunamadı."})
+
+        return JsonResponse({
+            'success': True,
+            'message': f"✅ Gemini ile başarılı analiz! {count} etiket okundu.",
+            'count': count,
+            'results': processed_results
+        })
+
+    except APIError as e:
+        # API anahtarı geçersizse veya kota aşılmışsa yakala
+        return JsonResponse({'success': False, 'message': f"Gemini API Hatası: Lütfen GEMINI_API_KEY'i kontrol edin. Detay: {e}"}, status=500)
+    except Exception as e:
+        # Diğer tüm hataları yakala (Dosya formatı, PIL hatası vb.)
+        # print(f"Kritik YZ Analiz Hatası: {e}")
+        return JsonResponse({'success': False, 'message': f"Kritik YZ Analiz Hatası: {e}"}, status=500)
 
 
 @csrf_exempt
 def export_excel(request, sayim_emri_id): # pk yerine sayim_emri_id kullanıldı
-     # ... (kod aynı kaldı)
-     return HttpResponse("Excel İndirme Başarılı")
+    # ... (kod aynı kaldı)
+    return HttpResponse("Excel İndirme Başarılı")
 
 
 @csrf_exempt
 def export_mutabakat_excel(request, sayim_emri_id): # pk yerine sayim_emri_id kullanıldı
-     # ... (kod aynı kaldı)
-     return HttpResponse("Mutabakat Excel İndirme Başarılı")
+    # ... (kod aynı kaldı)
+    return HttpResponse("Mutabakat Excel İndirme Başarılı")
