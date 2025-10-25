@@ -780,28 +780,50 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             data = json.loads(request.body)
             bid = data.get('benzersiz_id') 
             print(f"\n--- KAYIT (ID ile) --- Gelen JSON: {data} -> ID: {bid}")
-            if not bid: print(">> HATA: Benzersiz ID yok."); return JsonResponse({'success': False, 'message': "HATA: Ürün ID eksik."}, status=400)
+            if not bid: 
+                print(">> HATA: Benzersiz ID yok.")
+                return JsonResponse({'success': False, 'message': "HATA: Ürün ID eksik."}, status=400)
+            
+            # --- DÜZELTME BAŞLANGICI ---
             try:
-                # Gelen miktar string'ini Decimal'e çevir
-                m = Decimal(str(data.get('miktar', '0.0')).replace(',', '.'))
-                if m <= Decimal('0.0'): raise ValueError("Miktar pozitif olmalı")
-            except Exception as e: print(f">> HATA: Miktar ({data.get('miktar')}) geçersiz: {e}"); return JsonResponse({'success': False, 'message': f"HATA: Geçersiz miktar."}, status=400)
+                # Gelen miktar string'ini al, temizle
+                miktar_str = str(data.get('miktar', '0.0')).replace(',', '.').strip()
+                
+                # Eğer miktar_str boşsa ('') veya None ise, '0.0' olarak ayarla
+                if not miktar_str:
+                    miktar_str = '0.0'
+                    
+                m = Decimal(miktar_str) # Şimdi Decimal'e çevir
+                
+                if m <= Decimal('0.0'): 
+                    # 0 veya eksi miktar gelirse hata ver
+                    print(f">> HATA: Miktar ({m}) pozitif olmalı.")
+                    return JsonResponse({'success': False, 'message': f"HATA: Miktar pozitif olmalı."}, status=400)
+                    
+            except Exception as e: 
+                # Eğer Decimal'e çevrilemezse (örn: "abc" gelirse)
+                print(f">> HATA: Miktar ({data.get('miktar')}) geçersiz: {e}")
+                return JsonResponse({'success': False, 'message': f"HATA: Geçersiz miktar formatı."}, status=400)
+            # --- DÜZELTME BİTTİ ---
             
             pa = data.get('personel_adi', 'MISAFIR').strip().upper() or 'MISAFIR'
             lat, lon = str(data.get('lat', 'YOK')), str(data.get('lon', 'YOK'))
             
             try: malzeme = get_object_or_404(Malzeme, benzersiz_id=bid) 
-            except Http404: print(f">> HATA: Malzeme ID({bid}) bulunamadı."); return JsonResponse({'success': False, 'message': f"HATA: ID '{bid}' bulunamadı."}, status=404)
+            except Http404: 
+                print(f">> HATA: Malzeme ID({bid}) bulunamadı.")
+                return JsonResponse({'success': False, 'message': f"HATA: ID '{bid}' bulunamadı."}, status=404)
             
             se = get_object_or_404(SayimEmri, pk=sayim_emri_id)
-            if se.durum != 'Açık': print(f">> HATA: Sayım Emri ({sayim_emri_id}) kapalı."); return JsonResponse({'success': False, 'message': 'Sayım kapalı.'}, status=403) 
+            if se.durum != 'Açık': 
+                print(f">> HATA: Sayım Emri ({sayim_emri_id}) kapalı.")
+                return JsonResponse({'success': False, 'message': 'Sayım kapalı.'}, status=403) 
             
             print(f">> Detay Oluşturuluyor: Miktar={m}, Personel={pa}...")
             
-            # SayimDetay.objects.create (models.py'de unique_together kaldırıldığı için bu artık sorunsuz çalışır)
             SayimDetay.objects.create(
                 sayim_emri=se, 
-                benzersiz_malzeme=malzeme, # Sadece ilişki
+                benzersiz_malzeme=malzeme,
                 personel_adi=pa, 
                 sayilan_stok=m, # Decimal olarak kaydedilecek
                 latitude=lat, 
@@ -809,19 +831,25 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             )
             print("   -> Oluşturuldu.")
             
-            # Toplamı al (Sum sonucu Decimal gelecek)
             ts = SayimDetay.objects.filter(sayim_emri=se, benzersiz_malzeme=malzeme).aggregate(t=Sum('sayilan_stok'))['t'] or Decimal('0.0')
             print(f"   -> Yeni Toplam: {ts}")
             print(f"--- KAYIT BİTTİ (Başarılı) ---")
             
-            # JSON yanıtını formatla
             return JsonResponse({'success': True, 'message': f"✅ {malzeme.malzeme_kodu} ({malzeme.parti_no}) {m:.2f} kayıt.", 'yeni_miktar': f"{ts:.2f}" })
         
-        except SayimEmri.DoesNotExist: print(f">> HATA: Sayım Emri ID({sayim_emri_id}) yok."); return JsonResponse({'success': False, 'message': "HATA: Sayım Emri yok."}, status=404)
-        except json.JSONDecodeError: print(f">> HATA: JSON Decode."); return JsonResponse({'success': False, 'message': "HATA: Geçersiz JSON."}, status=400)
-        except Exception as e: et = type(e).__name__; print(f">> Kritik HATA ({et}): {e}"); return JsonResponse({'success': False, 'message': f"Sunucu hatası ({et})."}, status=500)
+        except SayimEmri.DoesNotExist: 
+            print(f">> HATA: Sayım Emri ID({sayim_emri_id}) yok.")
+            return JsonResponse({'success': False, 'message': "HATA: Sayım Emri yok."}, status=404)
+        except json.JSONDecodeError: 
+            print(f">> HATA: JSON Decode.")
+            return JsonResponse({'success': False, 'message': "HATA: Geçersiz JSON."}, status=400)
+        except Exception as e: 
+            et = type(e).__name__; 
+            print(f">> Kritik HATA ({et}): {e}")
+            return JsonResponse({'success': False, 'message': f"Sunucu hatası ({et})."}, status=500)
     
-    return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=405) 
+    return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=405)
+ 
 
 @csrf_exempt
 @require_POST
