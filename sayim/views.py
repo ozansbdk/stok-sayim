@@ -438,6 +438,23 @@ def yonetim_araclari(request):
     # Orijinal HTML dosyasını göster
     return render(request, 'sayim/yonetim.html', {}) 
 
+# Bu fonksiyonun adı `urls.py`'da aranıyor ama `views.py`'da yok. 
+# Geçici olarak buraya ekliyoruz ki ImportError çözülsün.
+@csrf_exempt
+@transaction.atomic
+def reset_sayim_data(request):
+    """Tüm sayım emirlerini ve detaylarını siler (Yönetici aracı)."""
+    if request.method == 'POST':
+        try:
+            SayimDetay.objects.all().delete()
+            SayimEmri.objects.all().delete()
+            return JsonResponse({'success': True, 'message': 'Tüm sayım kayıtları ve emirleri başarıyla SIFIRLANDI.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': f'Veri silinirken hata oluştu: {e}'})
+
+    return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=400)
+
+
 @csrf_exempt
 @transaction.atomic
 def upload_and_reload_stok_data(request):
@@ -666,7 +683,7 @@ def ajax_akilli_stok_ara(request):
     return JsonResponse(response_data)
 
 # ####################################################################################
-# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Kayıt Hatası Çözümü ve Veri Temizliği)
+# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Kayıt Hatası Çözümü - iexact Kullanımı)
 # ####################################################################################
 
 @csrf_exempt
@@ -688,8 +705,11 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             longitude = data.get('lon', 'YOK')
             loc_hata = data.get('loc_hata', '')
 
-            # 1. Malzeme ve Sayım Emrini Bul (Benzersiz ID kontrolü yerine 4 alan ile esnek arama)
-            # NOT: Bu sorgu, veritabanındaki büyük/küçük harf tutarsızlıklarını yoksaymak için iexact kullanır.
+            # 1. Malzeme ve Sayım Emrini Bul (Büyük/küçük harf duyarsız eşleşme)
+            # NOT: Bu sorgu, tek bir sonuç döndürmelidir. Eğer birden fazla 
+            # eşleşme varsa (örn: 'YOK' değeri birden fazla kayıtta varsa), 
+            # MultipleObjectsReturned hatası alınabilir. Bu durumda daha 
+            # spesifik bir filtreleme gerekebilir.
             malzeme = Malzeme.objects.get(
                 malzeme_kodu__iexact=stok_kod,
                 parti_no__iexact=parti_no,
@@ -708,10 +728,10 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 benzersiz_malzeme=malzeme,
                 personel_adi=personel_adi,
                 sayilan_stok=miktar,
-                malzeme_kodu=stok_kod, # Kayıt yaparken temizlenmiş verileri kullanıyoruz
-                parti_no=parti_no,
-                renk=renk,
-                lokasyon_kodu=depo_kod,
+                malzeme_kodu=malzeme.malzeme_kodu, # Malzemeden alınan doğru veriyi kaydet
+                parti_no=malzeme.parti_no,
+                renk=malzeme.renk,
+                lokasyon_kodu=malzeme.lokasyon_kodu,
                 latitude=str(latitude),
                 longitude=str(longitude),
                 konum_hata_mesaji=loc_hata
@@ -724,7 +744,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             
             return JsonResponse({
                 'success': True, 
-                'message': f"✅ {stok_kod} ({parti_no}) için {miktar:.2f} kayıt edildi.",
+                'message': f"✅ {malzeme.malzeme_kodu} ({malzeme.parti_no}) için {miktar:.2f} kayıt edildi.",
                 'yeni_miktar': f"{toplam_sayilan:.2f}"
             })
 
@@ -732,6 +752,10 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             # Kayıt hatası çözümü: Hatanın nedenini tam olarak gösteriyoruz.
             hata_mesaji = f"HATA: Stok Kodu: {stok_kod}, Parti No: {parti_no}, Renk: {renk}, Depo: {depo_kod} kombinasyonu veritabanında bulunamadı. Lütfen arama yapın."
             return JsonResponse({'success': False, 'message': hata_mesaji}, status=404)
+        except Malzeme.MultipleObjectsReturned:
+             # Eğer aynı kombinasyon birden fazla varsa bu hata alınır. 
+             hata_mesaji = f"HATA: Stok Kodu: {stok_kod}, Parti No: {parti_no}, Renk: {renk}, Depo: {depo_kod} kombinasyonu birden fazla bulundu. Veri tutarlılığını kontrol edin."
+             return JsonResponse({'success': False, 'message': hata_mesaji}, status=400)
         except SayimEmri.DoesNotExist:
             return JsonResponse({'success': False, 'message': "HATA: Geçersiz Sayım Emri ID'si."}, status=404)
         except Exception as e:
@@ -855,3 +879,4 @@ def export_excel(request, sayim_emri_id): # pk yerine sayim_emri_id kullanıldı
 def export_mutabakat_excel(request, sayim_emri_id): # pk yerine sayim_emri_id kullanıldı
     # ... (kod aynı kaldı)
     return HttpResponse("Mutabakat Excel İndirme Başarılı")
+
