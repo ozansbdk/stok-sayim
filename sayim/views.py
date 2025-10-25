@@ -678,6 +678,14 @@ def ajax_akilli_stok_ara(request):
     renk = standardize_id_part(request.GET.get('renk', 'YOK'))
     depo_kod = standardize_id_part(request.GET.get('depo_kod', 'YOK')) # Depo kodu zorunlu olmalı
     
+    # DEBUG: Gelen ve standardize edilmiş parametreleri yazdır
+    print(f"--- ARAMA BAŞLADI ---")
+    print(f"Gelen Seri No: {request.GET.get('seri_no', 'YOK')}, Standart: {seri_no}")
+    print(f"Gelen Stok Kod: {request.GET.get('stok_kod', 'YOK')}, Standart: {stok_kod}")
+    print(f"Gelen Parti No: {request.GET.get('parti_no', 'YOK')}, Standart: {parti_no}")
+    print(f"Gelen Renk: {request.GET.get('renk', 'YOK')}, Standart: {renk}")
+    print(f"Gelen Depo Kod: {request.GET.get('depo_kod', 'YOK')}, Standart: {depo_kod}")
+    
     # Başlangıç yanıt verisi
     response_data = {
         'found': False, 'urun_bilgi': 'Stok veya Barkod bulunamadı.',
@@ -691,22 +699,30 @@ def ajax_akilli_stok_ara(request):
     # Depo kodu gelmediyse hata döndür
     if depo_kod == 'YOK':
         response_data['urun_bilgi'] = 'HATA: Depo kodu belirtilmedi.'
+        print("ARAMA SONUCU: Depo kodu YOK, hata döndü.")
         return JsonResponse(response_data, status=400)
 
     # -----------------------------------------------------------
     # 1. Hiyerarşi: Seri No / Barkod ile TAM EŞLEŞME (iexact)
     # -----------------------------------------------------------
     if seri_no != 'YOK':
+        print(f"1. ADIM: Seri No ({seri_no}) ile aranıyor...")
         # Sadece ilgili depoda ara
         malzeme = Malzeme.objects.filter(
             Q(benzersiz_id__iexact=seri_no) | Q(malzeme_kodu__iexact=seri_no),
             lokasyon_kodu__iexact=depo_kod
         ).first()
+        if malzeme:
+             print(f"1. ADIM SONUCU: Seri No ile bulundu: {malzeme}")
+        else:
+             print(f"1. ADIM SONUCU: Seri No ile bulunamadı.")
+
 
     # -----------------------------------------------------------
     # 2. Hiyerarşi: Parti No ile Arama (Parti No + Depo + Opsiyonel Stok Kodu)
     # -----------------------------------------------------------
     if not malzeme and parti_no != 'YOK':
+        print(f"2. ADIM: Parti No ({parti_no}) ile aranıyor (Stok Kodu: {stok_kod})...")
         # Eğer stok kodu da varsa, daha spesifik ara
         if stok_kod != 'YOK':
              malzeme = Malzeme.objects.filter(
@@ -720,53 +736,62 @@ def ajax_akilli_stok_ara(request):
                 parti_no__iexact=parti_no,
                 lokasyon_kodu__iexact=depo_kod
             ).first()
-            # Eğer sadece parti ile arama yapıldıysa ve bulunduysa, 
-            # kullanıcıya stok kodunu teyit etmesi için varyantları göstermek daha iyi olabilir.
-            # Şimdilik ilk bulunanı döndürüyoruz. Gerekirse bu kısım revize edilebilir.
+        if malzeme:
+             print(f"2. ADIM SONUCU: Parti No ile bulundu: {malzeme}")
+        else:
+             print(f"2. ADIM SONUCU: Parti No ile bulunamadı.")
+
 
     # -----------------------------------------------------------
     # 3. Hiyerarşi: Stok Kodu + Parti No + Renk ile Tam Eşleşme
-    # Bu adım aslında Parti No aramasıyla birleşti, ama yedek olarak kalabilir.
     # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
+        print(f"3. ADIM: Stok ({stok_kod}), Parti ({parti_no}), Renk ({renk}) ile aranıyor...")
         malzeme = Malzeme.objects.filter(
             malzeme_kodu__iexact=stok_kod,
             parti_no__iexact=parti_no,
             renk__iexact=renk,
             lokasyon_kodu__iexact=depo_kod
         ).first()
+        if malzeme:
+             print(f"3. ADIM SONUCU: Tam kombinasyon ile bulundu: {malzeme}")
+        else:
+             print(f"3. ADIM SONUCU: Tam kombinasyon ile bulunamadı.")
 
     # -----------------------------------------------------------
     # 4. Hiyerarşi: Sadece Stok Kodu ile Arama (Varyant Listeleme)
     # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK':
+        print(f"4. ADIM: Sadece Stok Kodu ({stok_kod}) ile varyant aranıyor...")
         varyantlar = Malzeme.objects.filter(
             malzeme_kodu__iexact=stok_kod,
             lokasyon_kodu__iexact=depo_kod
         )
-        
         varyant_count = varyantlar.count()
+        print(f"4. ADIM SONUCU: {varyant_count} varyant bulundu.")
         
         if varyant_count == 1:
             # Tek varyant varsa, onu seç
             malzeme = varyantlar.first()
+            print(f"   -> Tek varyant bulundu ve seçildi: {malzeme}")
         elif varyant_count > 1:
             # Birden fazla varyant varsa, listele
             response_data['urun_bilgi'] = f"Varyant Seçimi Gerekli: {stok_kod} için {varyant_count} varyant bulundu."
             response_data['stok_kod'] = stok_kod # Stok kodunu teyit et
-            # Distinct parti ve renkleri al
             partiler = sorted(list(varyantlar.values_list('parti_no', flat=True).distinct()))
             renkler = sorted(list(varyantlar.values_list('renk', flat=True).distinct()))
             response_data['parti_varyantlar'] = [p for p in partiler if p != 'YOK']
             response_data['renk_varyantlar'] = [r for r in renkler if r != 'YOK']
+            print(f"   -> Birden fazla varyant bulundu, liste döndürülüyor.")
+            print(f"--- ARAMA BİTTİ (Varyant Listesi) ---")
             return JsonResponse(response_data) 
-            # NOT: Bu durumda malzeme = None kalır ve aşağıda 'Bulunamadı' mesajı döner.
-            # Ancak varyant listesi döndüğü için JS tarafı bunu işlemeli.
+            
 
     # -----------------------------------------------------------
     # NİHAİ SONUÇ İŞLEME: Eğer bir malzeme bulunduysa
     # -----------------------------------------------------------
     if malzeme:
+        print(f"NİHAİ SONUÇ: Malzeme bulundu: {malzeme}. Detaylar işleniyor...")
         # Toplam sayılan miktarı al
         toplam_sayilan = SayimDetay.objects.filter(benzersiz_malzeme=malzeme)\
             .aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or Decimal('0.0')
@@ -780,6 +805,8 @@ def ajax_akilli_stok_ara(request):
         if diger_depolar.exists():
             depo_isimleri = ", ".join(sorted([standardize_id_part(d) for d in diger_depolar]))
             farkli_depo_uyarisi = f"⚠️ DİKKAT! Bu ürünün stoğu {depo_isimleri} depolarında da mevcut."
+            print(f"   -> Farklı depo uyarısı eklendi: {farkli_depo_uyarisi}")
+
 
         # Başarılı yanıtı oluştur
         response_data.update({
@@ -791,21 +818,23 @@ def ajax_akilli_stok_ara(request):
             'sistem_stok': f"{malzeme.sistem_stogu:.2f}", 
             'sayilan_stok': f"{toplam_sayilan:.2f}",
             'last_sayim': get_last_sayim_info(malzeme) or 'Yok', # Nesneyi gönder
-            'parti_varyantlar': [], # Tam eşleşme olduğu için varyant listesi boş
+            'parti_varyantlar': [], 
             'renk_varyantlar': [],
             'farkli_depo_uyarisi': farkli_depo_uyarisi
         })
+        print(f"--- ARAMA BİTTİ (Başarılı) ---")
         return JsonResponse(response_data)
         
-    # Eğer hiçbir arama adımında malzeme bulunamadıysa, başlangıçtaki hata mesajıyla dön
-    # Hangi parametre ile arama yapıldığını mesaja ekleyebiliriz
+    # Eğer hiçbir arama adımında malzeme bulunamadıysa
     aranan_deger = seri_no if seri_no != 'YOK' else (parti_no if parti_no != 'YOK' else stok_kod)
     response_data['urun_bilgi'] = f"'{aranan_deger}' bilgisi ile '{depo_kod}' deposunda stok bulunamadı."
+    print(f"NİHAİ SONUÇ: Malzeme bulunamadı. Aranan: {aranan_deger}, Depo: {depo_kod}")
+    print(f"--- ARAMA BİTTİ (Başarısız) ---")
     return JsonResponse(response_data)
 
 
 # ####################################################################################
-# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Kayıt Hatası Çözümü - iexact ve MultipleObjectsReturned)
+# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Kayıt Hatası Çözümü - iexact ve MultipleObjectsReturned + LOGGING)
 # ####################################################################################
 
 @csrf_exempt
@@ -821,15 +850,26 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             renk = standardize_id_part(data.get('renk', 'YOK'))
             depo_kod = standardize_id_part(data.get('depo_kod', 'YOK'))
             
+            # DEBUG: Kayıt için gelen ve standardize edilmiş veriyi yazdır
+            print(f"--- KAYIT BAŞLADI ---")
+            print(f"Gelen JSON: {data}")
+            print(f"Standardize Edilmiş Stok Kod: {stok_kod}")
+            print(f"Standardize Edilmiş Parti No: {parti_no}")
+            print(f"Standardize Edilmiş Renk: {renk}")
+            print(f"Standardize Edilmiş Depo Kod: {depo_kod}")
+
             # Gerekli alanlar boşsa hata ver
             if stok_kod == 'YOK' or depo_kod == 'YOK':
+                 print("KAYIT HATASI: Stok Kodu veya Depo Kodu YOK.")
                  return JsonResponse({'success': False, 'message': "HATA: Stok Kodu ve Depo Kodu boş olamaz."}, status=400)
 
             try:
                 miktar = Decimal(data.get('miktar', '0.0'))
                 if miktar <= 0:
+                   print(f"KAYIT HATASI: Miktar ({miktar}) sıfırdan büyük değil.")
                    return JsonResponse({'success': False, 'message': "HATA: Miktar sıfırdan büyük olmalıdır."}, status=400) 
-            except (ValueError, TypeError, Decimal.InvalidOperation):
+            except (ValueError, TypeError, Decimal.InvalidOperation) as e:
+                print(f"KAYIT HATASI: Miktar ({data.get('miktar')}) dönüştürülemedi: {e}")
                 return JsonResponse({'success': False, 'message': "HATA: Geçersiz miktar formatı."}, status=400)
 
             personel_adi = data.get('personel_adi', 'MISAFIR').strip().upper()
@@ -841,67 +881,75 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
 
             # 1. Malzeme ve Sayım Emrini Bul (Büyük/küçük harf duyarsız eşleşme)
             try:
+                # DEBUG: Hangi filtrelerle arama yapıldığını yazdır
+                print(f"Malzeme Aranıyor: Stok='{stok_kod}', Parti='{parti_no}', Renk='{renk}', Depo='{depo_kod}' (iexact ile)")
                 malzeme = Malzeme.objects.get(
                     malzeme_kodu__iexact=stok_kod,
                     parti_no__iexact=parti_no,
                     renk__iexact=renk,
                     lokasyon_kodu__iexact=depo_kod
                 )
+                print(f"Malzeme Bulundu: {malzeme}")
             except Malzeme.DoesNotExist:
                  hata_mesaji = f"HATA: Stok Kodu: {stok_kod}, Parti: {parti_no}, Renk: {renk}, Depo: {depo_kod} kombinasyonu veritabanında bulunamadı. Lütfen arama yapıp doğru ürünü seçin."
+                 print(f"KAYIT HATASI: Malzeme.DoesNotExist - {hata_mesaji}")
                  return JsonResponse({'success': False, 'message': hata_mesaji}, status=404)
             except Malzeme.MultipleObjectsReturned:
-                 # Bu durum veri tutarsızlığına işaret eder. Loglamak iyi olur.
-                 # print(f"UYARI: MultipleObjectsReturned - Stok: {stok_kod}, Parti: {parti_no}, Renk: {renk}, Depo: {depo_kod}")
                  hata_mesaji = f"HATA: Belirtilen kombinasyon ({stok_kod}, {parti_no}, {renk}, {depo_kod}) için birden fazla stok kaydı bulundu. Veritabanı yöneticinize başvurun."
-                 return JsonResponse({'success': False, 'message': hata_mesaji}, status=400) # 400 Bad Request daha uygun
+                 print(f"KAYIT HATASI: Malzeme.MultipleObjectsReturned - {hata_mesaji}")
+                 return JsonResponse({'success': False, 'message': hata_mesaji}, status=400) 
 
             # Sayım Emrini kontrol et
             sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
             if sayim_emri.durum != 'Açık':
-                 return JsonResponse({'success': False, 'message': 'Sayım emri kapalı olduğu için kayıt yapılamaz.'}, status=403) # 403 Forbidden
+                 print(f"KAYIT HATASI: Sayım Emri ({sayim_emri_id}) durumu Açık değil: {sayim_emri.durum}")
+                 return JsonResponse({'success': False, 'message': 'Sayım emri kapalı olduğu için kayıt yapılamaz.'}, status=403) 
 
             # 2. Yeni Sayım Detayını Oluştur
+            print(f"Sayım Detayı Oluşturuluyor: Miktar={miktar}, Personel={personel_adi}")
             SayimDetay.objects.create(
                 sayim_emri=sayim_emri,
-                benzersiz_malzeme=malzeme, # İlişkiyi kur
+                benzersiz_malzeme=malzeme, 
                 personel_adi=personel_adi,
                 sayilan_stok=miktar,
-                # Kayıt yaparken Malzeme nesnesinden alınan doğru ve tutarlı veriyi kullan
                 malzeme_kodu=malzeme.malzeme_kodu, 
                 parti_no=malzeme.parti_no,
                 renk=malzeme.renk,
                 lokasyon_kodu=malzeme.lokasyon_kodu,
                 latitude=latitude,
                 longitude=longitude,
-                konum_hata_mesaji=loc_hata or '' # Boş string olarak kaydet
+                konum_hata_mesaji=loc_hata or '' 
             )
+            print("Sayım Detayı Başarıyla Oluşturuldu.")
 
             # 3. Bu malzeme için güncel toplam sayılan miktarı hesapla
             toplam_sayilan = SayimDetay.objects.filter(
-                sayim_emri=sayim_emri, # Sadece bu sayım emri içindeki toplamı al
+                sayim_emri=sayim_emri, 
                 benzersiz_malzeme=malzeme
             ).aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or Decimal('0.0')
+            print(f"Yeni Toplam Sayılan Miktar: {toplam_sayilan}")
             
             # Başarılı yanıt
+            print(f"--- KAYIT BİTTİ (Başarılı) ---")
             return JsonResponse({
                 'success': True, 
                 'message': f"✅ {malzeme.malzeme_kodu} ({malzeme.parti_no}) {miktar:.2f} adet kayıt edildi.",
-                'yeni_miktar': f"{toplam_sayilan:.2f}" # Bu sayım emri için yeni toplam
+                'yeni_miktar': f"{toplam_sayilan:.2f}" 
             })
 
         except SayimEmri.DoesNotExist:
-             # Bu normalde URL'den dolayı pek olmaz ama kontrol etmek iyi.
-            return JsonResponse({'success': False, 'message': "HATA: Geçersiz Sayım Emri ID'si."}, status=404)
-        except json.JSONDecodeError:
+             print(f"KAYIT HATASI: SayimEmri.DoesNotExist - ID: {sayim_emri_id}")
+             return JsonResponse({'success': False, 'message': "HATA: Geçersiz Sayım Emri ID'si."}, status=404)
+        except json.JSONDecodeError as e:
+             print(f"KAYIT HATASI: json.JSONDecodeError - {e}")
              return JsonResponse({'success': False, 'message': "HATA: Geçersiz istek verisi formatı (JSON bekleniyor)."}, status=400)
         except Exception as e:
-            # Diğer tüm beklenmedik hataları logla ve genel bir hata mesajı dön
-            # print(f"Kritik Kayıt Hatası ({type(e).__name__}): {e}") # Debugging için
-            return JsonResponse({'success': False, 'message': f"Beklenmedik bir sunucu hatası oluştu. Lütfen tekrar deneyin veya yöneticiye bildirin."}, status=500)
+             print(f"Kritik Kayıt Hatası ({type(e).__name__}): {e}") # Debugging için
+             return JsonResponse({'success': False, 'message': f"Beklenmedik bir sunucu hatası oluştu. Lütfen tekrar deneyin veya yöneticiye bildirin."}, status=500)
 
     # POST dışındaki metodlar için
-    return JsonResponse({'success': False, 'message': 'Geçersiz istek metodu (POST bekleniyor).'}, status=405) # 405 Method Not Allowed
+    print(f"KAYIT HATASI: Geçersiz metot ({request.method})")
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek metodu (POST bekleniyor).'}, status=405) 
 
 
 # ####################################################################################
@@ -1079,4 +1127,3 @@ def export_mutabakat_excel(request, sayim_emri_id):
     # Şimdilik basit yanıt
     sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
     return HttpResponse(f"'{sayim_emri.ad}' için Mutabakat Excel İndirme İşlevi Henüz Uygulanmadı.", status=501)
-
