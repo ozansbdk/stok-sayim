@@ -440,21 +440,6 @@ def yonetim_araclari(request):
 
 @csrf_exempt
 @transaction.atomic
-def reset_sayim_data(request):
-    """Tüm sayım emirlerini ve detaylarını siler (Yönetici aracı)."""
-    if request.method == 'POST':
-        try:
-            SayimDetay.objects.all().delete()
-            SayimEmri.objects.all().delete()
-            return JsonResponse({'success': True, 'message': 'Tüm sayım kayıtları ve emirleri başarıyla SIFIRLANDI.'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Veri silinirken hata oluştu: {e}'})
-
-    return JsonResponse({'success': False, 'message': 'Geçersiz metot.'}, status=400)
-
-
-@csrf_exempt
-@transaction.atomic
 def upload_and_reload_stok_data(request):
     """
     Excel dosyasını alır, Pandas ile okur ve veritabanına yükler/günceller.
@@ -580,27 +565,34 @@ def ajax_akilli_stok_ara(request):
     
     # -----------------------------------------------------------
     # 1. Hiyerarşi: Seri No / Barkod ile Arama (En Yüksek Öncelik)
+    # NOT: ienexact yerine iexact kullanıldı ve sadece benzersiz_id ve malzeme_kodu aranır.
     # -----------------------------------------------------------
     if seri_no != 'YOK':
-        # Benzersiz ID'de tam arama veya Malzeme Kodu/Parti/Renk içinde kısmi arama
+        # iexact: Tam eşleşme (büyük/küçük harf duyarsız)
         barkod_q = Q(benzersiz_id__iexact=seri_no) | Q(malzeme_kodu__iexact=seri_no)
-        malzeme = Malzeme.objects.filter(barkod_q & Q(lokasyon_kodu=depo_kod)).first()
+        # Sadece barkod/seri no tam eşleşiyorsa ve depo kodu doğruysa bul
+        malzeme = Malzeme.objects.filter(barkod_q & Q(lokasyon_kodu__iexact=depo_kod)).first()
 
     # -----------------------------------------------------------
     # 2. Hiyerarşi: Stok Kodu + Parti No + Renk ile Tam Eşleşme
     # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
-        benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
-        malzeme = Malzeme.objects.filter(benzersiz_id=benzersiz_id).first()
-    
+        # 4 temel alanın tam eşleşmesi aranır (büyük/küçük harf duyarsız)
+        malzeme = Malzeme.objects.filter(
+            malzeme_kodu__iexact=stok_kod,
+            parti_no__iexact=parti_no,
+            renk__iexact=renk,
+            lokasyon_kodu__iexact=depo_kod
+        ).first()
+
     # -----------------------------------------------------------
     # 3. Hiyerarşi: Stok Kodu + Parti (Parti odaklı eşleşme)
     # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK':
         malzeme = Malzeme.objects.filter(
-            malzeme_kodu=stok_kod, 
-            parti_no=parti_no,
-            lokasyon_kodu=depo_kod
+            malzeme_kodu__iexact=stok_kod, 
+            parti_no__iexact=parti_no,
+            lokasyon_kodu__iexact=depo_kod
         ).first()
 
     # -----------------------------------------------------------
@@ -608,10 +600,10 @@ def ajax_akilli_stok_ara(request):
     # -----------------------------------------------------------
     if not malzeme and stok_kod != 'YOK':
         
-        # Sadece Stok Koduna göre bu depodaki tüm varyantları getir
+        # Sadece Stok Koduna göre bu depodaki tüm varyantları getir (Büyük/küçük harf duyarsız)
         varyantlar = Malzeme.objects.filter(
-            malzeme_kodu=stok_kod,
-            lokasyon_kodu=depo_kod
+            malzeme_kodu__iexact=stok_kod,
+            lokasyon_kodu__iexact=depo_kod
         ).values('parti_no', 'renk', 'sistem_stogu').distinct()
 
         if varyantlar:
@@ -619,8 +611,13 @@ def ajax_akilli_stok_ara(request):
             # Eğer tek bir varyant varsa, onu otomatik olarak seç
             if len(varyantlar) == 1:
                 v = varyantlar[0]
-                benzersiz_id = generate_unique_id(stok_kod, v['parti_no'], depo_kod, v['renk'])
-                malzeme = Malzeme.objects.filter(benzersiz_id=benzersiz_id).first()
+                # Tekrar arama yaparak Malzeme objesini al
+                malzeme = Malzeme.objects.filter(
+                    malzeme_kodu__iexact=stok_kod,
+                    parti_no__iexact=v['parti_no'],
+                    renk__iexact=v['renk'],
+                    lokasyon_kodu__iexact=depo_kod
+                ).first()
             
             # Birden fazla varyant varsa, liste döndür
             if not malzeme and len(varyantlar) > 0:
@@ -642,8 +639,8 @@ def ajax_akilli_stok_ara(request):
         
         # ⭐ YENİ ÖZELLİK: Farklı Depo Uyarısı Kontrolü
         diger_depolar = Malzeme.objects.filter(
-            malzeme_kodu=malzeme.malzeme_kodu
-        ).exclude(lokasyon_kodu=depo_kod).values_list('lokasyon_kodu', flat=True).distinct()
+            malzeme_kodu__iexact=malzeme.malzeme_kodu
+        ).exclude(lokasyon_kodu__iexact=depo_kod).values_list('lokasyon_kodu', flat=True).distinct()
         
         if diger_depolar.exists():
             depo_isimleri = ", ".join(sorted(list(diger_depolar)))
@@ -691,17 +688,13 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             longitude = data.get('lon', 'YOK')
             loc_hata = data.get('loc_hata', '')
 
-            # 1. Malzeme ve Sayım Emrini Bul
-            # Benzersiz ID'yi temizlenmiş verilerle oluştur
-            benzersiz_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
-            
-            # Malzeme kaydını bulmak için: Sadece benzersiz ID yerine, 
-            # Malzeme tablosundaki 4 ana alanı kullanmak daha sağlamdır
+            # 1. Malzeme ve Sayım Emrini Bul (Benzersiz ID kontrolü yerine 4 alan ile esnek arama)
+            # NOT: Bu sorgu, veritabanındaki büyük/küçük harf tutarsızlıklarını yoksaymak için iexact kullanır.
             malzeme = Malzeme.objects.get(
-                malzeme_kodu=stok_kod,
-                parti_no=parti_no,
-                renk=renk,
-                lokasyon_kodu=depo_kod
+                malzeme_kodu__iexact=stok_kod,
+                parti_no__iexact=parti_no,
+                renk__iexact=renk,
+                lokasyon_kodu__iexact=depo_kod
             )
             
             sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
@@ -715,7 +708,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 benzersiz_malzeme=malzeme,
                 personel_adi=personel_adi,
                 sayilan_stok=miktar,
-                malzeme_kodu=stok_kod,
+                malzeme_kodu=stok_kod, # Kayıt yaparken temizlenmiş verileri kullanıyoruz
                 parti_no=parti_no,
                 renk=renk,
                 lokasyon_kodu=depo_kod,
