@@ -122,8 +122,8 @@
     let currentRenk = 'YOK';
     let currentSeriNo = 'YOK';
     
-    // ⭐ KRİTİK ÇÖZÜM: SAYIM EMRİ ID'sini doğrudan template tag'inden alıyoruz.
-    const SAYIM_EMRI_ID = "{{ sayim_emri_id }}";
+    // ⭐ KRİTİK DEĞİŞKEN KALDIRILDI: Artık JavaScript değişkeni kullanmak yerine, 
+    // fetch içinde doğrudan Django template tag'lerini kullanacağız.
     
     // CSRF Token Fonksiyonu (Django POST için kritik)
     function getCookie(name) {
@@ -181,7 +181,6 @@
         document.getElementById('sistem_stok_goster').innerText = '0.00';
         document.getElementById('last_sayim_goster').innerText = 'Bilinmiyor';
         document.getElementById('kayit_mesaji').innerText = ''; 
-        document.getElementById('yeni_toplam_goster').innerText = '0.00'; // Temizle
         urunBilgiAlani.classList.remove('status-found', 'status-missing'); 
         urunBilgiAlani.classList.add('status-default'); 
 
@@ -204,8 +203,8 @@
             })
             .then(data => {
                 document.getElementById('urun_bilgi').innerText = data.urun_bilgi;
+                document.getElementById('sistem_stok_goster').innerText = data.sistem_stok;
                 document.getElementById('last_sayim_goster').innerText = data.last_sayim;
-                document.getElementById('yeni_toplam_goster').innerText = data.sayilan_stok || '0.00'; // Sayım sırasında güncel sayımı göster
                 
                 // Global değişkenleri güncelle
                 currentStokKod = data.stok_kod;
@@ -220,6 +219,7 @@
                     // Tam eşleşme bulundu
                     stokKodInput.value = data.stok_kod;
                     document.getElementById('sistem_stok_goster').innerText = data.sistem_stok;
+                    document.getElementById('yeni_toplam_goster').innerText = data.sayilan_stok; // Sayılan stoğu göster
                     urunBilgiAlani.classList.add('status-found'); 
                     updateVariantInputs({ parti_no: data.parti_no, renk: data.renk });
 
@@ -250,7 +250,8 @@
 
     // --- 3. GEMINI OKU FONKSİYONU (Toplu Sonuçları İşler) ---
     function geminiOku(file) {
-        const SAYIM_EMRI_ID = "{{ sayim_emri.pk }}";
+        // Doğrudan Sayım Emri ID'si için Django tag'ini kullanıyoruz.
+        const SAYIM_EMRI_ID = "{{ sayim_emri.pk }}"; 
         const topluSonucAlani = document.getElementById('toplu_sonuc_alani');
         const sonucTablosuBody = document.getElementById('sonuc_tablosu').getElementsByTagName('tbody')[0];
         
@@ -444,6 +445,7 @@
         const partiNoElement = document.getElementById('parti_no_input');
         const renkElement = document.getElementById('renk_input');
         
+        
         const currentPartiNo = partiNoElement ? partiNoElement.value.toUpperCase().trim() : 'YOK';
         const currentRenk = renkElement ? renkElement.value.toUpperCase().trim() : 'YOK';
         const currentStokKod = stokKodInput.value.toUpperCase().trim();
@@ -485,10 +487,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         // --- TEMEL TANIMLARI GÜNCELLE ---
         DEPO_KODU = document.getElementById('depo_kodu_gizli').innerText.trim();
-        // ⭐ KRİTİK DÜZELTME: SAYIM EMRİ ID'sini doğrudan template tag'inden alıyoruz.
-        // Bu, NoReverseMatch hatasını çözer.
         const PERSONEL_ADI = document.getElementById('personel_adi_gizli').innerText.trim();
         const miktarInput = document.getElementById('miktar_input');
+        const sayimKaydetBtn = document.getElementById('sayim_kaydet_btn');
 
         // Olay Dinleyicilerini Başlat
         setupGeminiListeners();
@@ -507,9 +508,21 @@
             akilliStokAra('YOK', stokKod, partiNo, renk, DEPO_KODU, 'YOK');
         });
 
+        // Miktar inputunda ENTER tuşuna basıldığında kaydetme işlemini tetikle
+        miktarInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); 
+                sayimKaydetBtn.click();
+            }
+        });
+
+
         // 5. Sayım Kaydetme Düğmesi
-        document.getElementById('sayim_kaydet_btn').addEventListener('click', async function() { // ASYNC yapıldı
+        sayimKaydetBtn.addEventListener('click', async function() { // ASYNC yapıldı
             const miktar = miktarInput.value;
+            
+            // Django'dan gelen Sayım Emri ID'sini doğrudan alıyoruz.
+            const SAYIM_EMRI_ID = "{{ sayim_emri.pk }}"; 
 
             if (!currentStokKod || currentStokKod === 'YOK') {
                 document.getElementById('kayit_mesaji').className = 'message error';
@@ -540,8 +553,8 @@
                 loc_hata: locationData.error // Konum alınamadıysa hata sebebi
             };
 
-            // NOT: SAYIM KAYDETME URL'si buraya eklendi
-            fetch(`{% url 'ajax_sayim_kaydet' sayim_emri_id=SAYIM_EMRI_ID %}`, {
+            // NOT: SAYIM KAYDETME URL'si buraya eklendi (Doğrudan sayim_emri.pk kullanıldı)
+            fetch(`{% url 'ajax_sayim_kaydet' sayim_emri_id=sayim_emri.pk %}`, {
                 method: 'POST',
                 headers: {
                     "Content-Type": "application/json",
@@ -554,11 +567,11 @@
                 if (data.success) {
                     // Konum alınamadıysa uyarı ver
                     if (locationData.error && locationData.error !== 'Geolocation not supported') {
-                        document.getElementById('kayit_mesaji').className = 'message error';
-                        document.getElementById('kayit_mesaji').innerText = `⚠️ Sayım kaydedildi. Ancak konum alınamadı: ${locationData.error}`;
+                         document.getElementById('kayit_mesaji').className = 'message error';
+                         document.getElementById('kayit_mesaji').innerText = `⚠️ Sayım kaydedildi. Ancak konum alınamadı: ${locationData.error}`;
                     } else {
-                        document.getElementById('kayit_mesaji').className = 'message success';
-                        document.getElementById('kayit_mesaji').innerText = data.message;
+                         document.getElementById('kayit_mesaji').className = 'message success';
+                         document.getElementById('kayit_mesaji').innerText = data.message;
                     }
                     
                     document.getElementById('yeni_toplam_goster').innerText = data.yeni_miktar;
@@ -572,14 +585,6 @@
                 document.getElementById('kayit_mesaji').className = 'message error';
                 document.getElementById('kayit_mesaji').innerText = `Kritik Kayıt Hatası: Sunucuya ulaşılamadı. ${error.message}`;
             });
-        });
-
-        // ENTER ile Kaydetme işlevi
-        miktarInput.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                document.getElementById('sayim_kaydet_btn').click();
-            }
         });
 
         // İlk yüklemede arama yap
