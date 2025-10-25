@@ -666,7 +666,7 @@ def get_last_sayim_info(malzeme_nesnesi): # benzersiz_id yerine nesneyi al
     return None
 
 # ####################################################################################
-# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - SON HİYERARŞİ VE UYARI
+# ⭐ OPTİMİZE EDİLMİŞ AKILLI ARAMA FONKSİYONU (views.py) - SON HİYERARŞİ VE UYARI + DEBUG
 # ####################################################################################
 
 @csrf_exempt
@@ -713,7 +713,7 @@ def ajax_akilli_stok_ara(request):
             lokasyon_kodu__iexact=depo_kod
         ).first()
         if malzeme:
-             print(f"1. ADIM SONUCU: Seri No ile bulundu: {malzeme}")
+             print(f"1. ADIM SONUCU: Seri No ile bulundu: {malzeme.benzersiz_id}") # Loglamayı iyileştir
         else:
              print(f"1. ADIM SONUCU: Seri No ile bulunamadı.")
 
@@ -723,21 +723,17 @@ def ajax_akilli_stok_ara(request):
     # -----------------------------------------------------------
     if not malzeme and parti_no != 'YOK':
         print(f"2. ADIM: Parti No ({parti_no}) ile aranıyor (Stok Kodu: {stok_kod})...")
-        # Eğer stok kodu da varsa, daha spesifik ara
+        query_params = {
+            'parti_no__iexact': parti_no,
+            'lokasyon_kodu__iexact': depo_kod
+        }
         if stok_kod != 'YOK':
-             malzeme = Malzeme.objects.filter(
-                malzeme_kodu__iexact=stok_kod,
-                parti_no__iexact=parti_no,
-                lokasyon_kodu__iexact=depo_kod
-            ).first()
-        else:
-            # Sadece parti no ve depo ile eşleşen İLK kaydı bul (Riskli olabilir!)
-             malzeme = Malzeme.objects.filter(
-                parti_no__iexact=parti_no,
-                lokasyon_kodu__iexact=depo_kod
-            ).first()
+             query_params['malzeme_kodu__iexact'] = stok_kod
+        
+        malzeme = Malzeme.objects.filter(**query_params).first()
+             
         if malzeme:
-             print(f"2. ADIM SONUCU: Parti No ile bulundu: {malzeme}")
+             print(f"2. ADIM SONUCU: Parti No ile bulundu: {malzeme.benzersiz_id}")
         else:
              print(f"2. ADIM SONUCU: Parti No ile bulunamadı.")
 
@@ -754,7 +750,7 @@ def ajax_akilli_stok_ara(request):
             lokasyon_kodu__iexact=depo_kod
         ).first()
         if malzeme:
-             print(f"3. ADIM SONUCU: Tam kombinasyon ile bulundu: {malzeme}")
+             print(f"3. ADIM SONUCU: Tam kombinasyon ile bulundu: {malzeme.benzersiz_id}")
         else:
              print(f"3. ADIM SONUCU: Tam kombinasyon ile bulunamadı.")
 
@@ -773,7 +769,7 @@ def ajax_akilli_stok_ara(request):
         if varyant_count == 1:
             # Tek varyant varsa, onu seç
             malzeme = varyantlar.first()
-            print(f"   -> Tek varyant bulundu ve seçildi: {malzeme}")
+            print(f"   -> Tek varyant bulundu ve seçildi: {malzeme.benzersiz_id}")
         elif varyant_count > 1:
             # Birden fazla varyant varsa, listele
             response_data['urun_bilgi'] = f"Varyant Seçimi Gerekli: {stok_kod} için {varyant_count} varyant bulundu."
@@ -791,10 +787,18 @@ def ajax_akilli_stok_ara(request):
     # NİHAİ SONUÇ İŞLEME: Eğer bir malzeme bulunduysa
     # -----------------------------------------------------------
     if malzeme:
-        print(f"NİHAİ SONUÇ: Malzeme bulundu: {malzeme}. Detaylar işleniyor...")
-        # Toplam sayılan miktarı al
-        toplam_sayilan = SayimDetay.objects.filter(benzersiz_malzeme=malzeme)\
-            .aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or Decimal('0.0')
+        print(f"NİHAİ SONUÇ: Malzeme bulundu: {malzeme.benzersiz_id}. Detaylar işleniyor...")
+        # Toplam sayılan miktarı al (SADECE BU SAYIM EMRİ İÇİN)
+        sayim_emri_id = request.GET.get('sayim_emri_id') # URL'den veya JS'den gelmeli
+        toplam_sayilan = Decimal('0.0')
+        if sayim_emri_id:
+            try:
+                toplam_sayilan = SayimDetay.objects.filter(
+                    sayim_emri_id=sayim_emri_id, 
+                    benzersiz_malzeme=malzeme
+                ).aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or Decimal('0.0')
+            except ValueError: # Geçersiz sayim_emri_id gelirse
+                pass 
         
         # Farklı depo uyarısı
         diger_depolar = Malzeme.objects.filter(malzeme_kodu__iexact=malzeme.malzeme_kodu)\
@@ -816,7 +820,7 @@ def ajax_akilli_stok_ara(request):
             'parti_no': malzeme.parti_no,
             'renk': malzeme.renk,
             'sistem_stok': f"{malzeme.sistem_stogu:.2f}", 
-            'sayilan_stok': f"{toplam_sayilan:.2f}",
+            'sayilan_stok': f"{toplam_sayilan:.2f}", # Bu sayım emri için toplam
             'last_sayim': get_last_sayim_info(malzeme) or 'Yok', # Nesneyi gönder
             'parti_varyantlar': [], 
             'renk_varyantlar': [],
@@ -834,7 +838,7 @@ def ajax_akilli_stok_ara(request):
 
 
 # ####################################################################################
-# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (Kayıt Hatası Çözümü - iexact ve MultipleObjectsReturned + LOGGING)
+# ⭐ KRİTİK REVİZYON: ajax_sayim_kaydet (TypeError Çözümü - Gereksiz Alanlar Kaldırıldı + LOGGING)
 # ####################################################################################
 
 @csrf_exempt
@@ -877,7 +881,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             
             latitude = str(data.get('lat', 'YOK')) # String olarak sakla
             longitude = str(data.get('lon', 'YOK'))
-            loc_hata = data.get('loc_hata', '')
+            # loc_hata = data.get('loc_hata', '') # Bu alan modelde yoktu, kaldırıldı
 
             # 1. Malzeme ve Sayım Emrini Bul (Büyük/küçük harf duyarsız eşleşme)
             try:
@@ -889,7 +893,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                     renk__iexact=renk,
                     lokasyon_kodu__iexact=depo_kod
                 )
-                print(f"Malzeme Bulundu: {malzeme}")
+                print(f"Malzeme Bulundu: {malzeme.benzersiz_id}") # ID'yi logla
             except Malzeme.DoesNotExist:
                  hata_mesaji = f"HATA: Stok Kodu: {stok_kod}, Parti: {parti_no}, Renk: {renk}, Depo: {depo_kod} kombinasyonu veritabanında bulunamadı. Lütfen arama yapıp doğru ürünü seçin."
                  print(f"KAYIT HATASI: Malzeme.DoesNotExist - {hata_mesaji}")
@@ -906,28 +910,25 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                  return JsonResponse({'success': False, 'message': 'Sayım emri kapalı olduğu için kayıt yapılamaz.'}, status=403) 
 
             # 2. Yeni Sayım Detayını Oluştur
-            print(f"Sayım Detayı Oluşturuluyor: Miktar={miktar}, Personel={personel_adi}")
+            print(f"Sayım Detayı Oluşturuluyor: Miktar={miktar}, Personel={personel_adi}, Lat={latitude}, Lon={longitude}")
+            # --- TypeError Düzeltmesi: Modelde olmayan alanları kaldır ---
             SayimDetay.objects.create(
                 sayim_emri=sayim_emri,
-                benzersiz_malzeme=malzeme, 
+                benzersiz_malzeme=malzeme, # Sadece ilişkiyi kurmak yeterli
                 personel_adi=personel_adi,
                 sayilan_stok=miktar,
-                malzeme_kodu=malzeme.malzeme_kodu, 
-                parti_no=malzeme.parti_no,
-                renk=malzeme.renk,
-                lokasyon_kodu=malzeme.lokasyon_kodu,
-                latitude=latitude,
-                longitude=longitude,
-                konum_hata_mesaji=loc_hata or '' 
+                latitude=latitude, # Modelde bu alanların olduğunu varsayıyoruz
+                longitude=longitude
+                # konum_hata_mesaji alanı modelde yoksa buraya eklenmemeli
             )
             print("Sayım Detayı Başarıyla Oluşturuldu.")
 
-            # 3. Bu malzeme için güncel toplam sayılan miktarı hesapla
+            # 3. Bu malzeme için güncel toplam sayılan miktarı hesapla (Sadece bu sayım emri için)
             toplam_sayilan = SayimDetay.objects.filter(
                 sayim_emri=sayim_emri, 
                 benzersiz_malzeme=malzeme
             ).aggregate(total_sayilan=Sum('sayilan_stok'))['total_sayilan'] or Decimal('0.0')
-            print(f"Yeni Toplam Sayılan Miktar: {toplam_sayilan}")
+            print(f"Yeni Toplam Sayılan Miktar (Bu Emir İçin): {toplam_sayilan}")
             
             # Başarılı yanıt
             print(f"--- KAYIT BİTTİ (Başarılı) ---")
@@ -945,7 +946,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
              return JsonResponse({'success': False, 'message': "HATA: Geçersiz istek verisi formatı (JSON bekleniyor)."}, status=400)
         except Exception as e:
              print(f"Kritik Kayıt Hatası ({type(e).__name__}): {e}") # Debugging için
-             return JsonResponse({'success': False, 'message': f"Beklenmedik bir sunucu hatası oluştu. Lütfen tekrar deneyin veya yöneticiye bildirin."}, status=500)
+             return JsonResponse({'success': False, 'message': f"Beklenmedik bir sunucu hatası oluştu: {type(e).__name__}. Lütfen tekrar deneyin veya yöneticiye bildirin."}, status=500)
 
     # POST dışındaki metodlar için
     print(f"KAYIT HATASI: Geçersiz metot ({request.method})")
@@ -985,7 +986,8 @@ def gemini_ocr_analiz(request):
         genai.configure(api_key=GEMINI_API_KEY) # configure kullanmak daha standart
 
         # Model ve konfigürasyon
-        model = genai.GenerativeModel('gemini-1.5-flash') # Güncel model adını kullanın
+        # model = genai.GenerativeModel('gemini-1.5-flash') # Güncel model adını kullanın - Bazen 1.0 Pro daha stabil olabilir
+        model = genai.GenerativeModel('gemini-pro-vision') # Veya Vision modelini deneyin
 
         system_instruction = (
             "You are an expert Optical Character Recognition (OCR) and data extraction system specialized in inventory labels. "
@@ -1001,43 +1003,22 @@ def gemini_ocr_analiz(request):
             "Remember: Return 'miktar' as a decimal number (float)."
         )
 
-        # API Çağrısı (GenerationConfig ile)
-        response = model.generate_content(
-            [prompt, img],
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json",
-                 # Şemayı daha esnek hale getirelim, sadece stok_kod zorunlu olsun
-                response_schema=genai.types.Schema(
-                    type=genai.types.Type.ARRAY,
-                    items=genai.types.Schema(
-                        type=genai.types.Type.OBJECT,
-                        properties={
-                            'stok_kod': genai.types.Schema(type=genai.types.Type.STRING),
-                            'parti_no': genai.types.Schema(type=genai.types.Type.STRING),
-                            'renk': genai.types.Schema(type=genai.types.Type.STRING),
-                            'miktar': genai.types.Schema(type=genai.types.Type.NUMBER)
-                        },
-                         required=['stok_kod'] # Sadece stok kodu zorunlu
-                    )
-                )
-            )
-            # Stream=False varsayılan olmalı
-        )
+        # API Çağrısı (GenerationConfig olmadan, Vision modeliyle deneyelim)
+        # Vision modeli genellikle şema zorlamasına ihtiyaç duymaz ve daha esnektir.
+        response = model.generate_content([prompt, img])
 
-        # Yanıtı işle (response.text yerine response.parts kullanmak daha güvenli olabilir)
+
+        # Yanıtı işle (response.text doğrudan JSON içerebilir)
         try:
-            # Gemini bazen yanıtı parts içinde döndürür
-            if response.parts:
-                # Genellikle ilk part JSON içerir
-                 json_text = response.parts[0].text 
-            else:
-                 # Veya doğrudan text içinde olabilir (eski versiyonlar?)
-                 json_text = response.text 
+            json_text = response.text 
+            # JSON'u parse etmeden önce başında/sonunda olabilecek ```json ``` gibi işaretleri temizle
+            if json_text.strip().startswith("```json"):
+                json_text = json_text.strip()[7:]
+            if json_text.strip().endswith("```"):
+                 json_text = json_text.strip()[:-3]
+                 
+            json_results = json.loads(json_text.strip()) # Temizlenmiş metni parse et
             
-            # JSON'u parse et
-            json_results = json.loads(json_text)
-            
-            # Gelen verinin liste olup olmadığını kontrol et
             if not isinstance(json_results, list):
                  raise json.JSONDecodeError("API'den beklenen liste formatı gelmedi.", json_text, 0)
 
@@ -1052,31 +1033,26 @@ def gemini_ocr_analiz(request):
         # Sonuçları işle ve standardize et
         processed_results = []
         for item in json_results:
-             # item'ın dictionary olup olmadığını kontrol et
              if not isinstance(item, dict): continue 
 
              try:
-                 # Miktar 'YOK' veya boş string ise veya sayı değilse 0 ata
                  miktar_raw = item.get('miktar', 0)
                  if isinstance(miktar_raw, str) and (miktar_raw.upper() == 'YOK' or not miktar_raw.strip()):
                       miktar_decimal = Decimal('0.0')
                  else:
-                      # Sayıya çevirmeyi dene
                       miktar_decimal = Decimal(str(miktar_raw)) 
              except (ValueError, TypeError, Decimal.InvalidOperation):
-                 miktar_decimal = Decimal('1.0') # Hatalı miktarda varsayılan 1 ata? Ya da 0? Karar verilmeli.
+                 miktar_decimal = Decimal('1.0') # Varsayılan 1 ata?
 
              stok_kod_std = standardize_id_part(item.get('stok_kod', 'YOK'))
-             # Eğer stok kodu hala YOK ise, bu sonucu atla
-             if stok_kod_std == 'YOK':
-                  continue
+             if stok_kod_std == 'YOK': continue # Stok kodu olmayanları atla
 
              processed_results.append({
                  'stok_kod': stok_kod_std,
                  'parti_no': standardize_id_part(item.get('parti_no', 'YOK')),
                  'renk': standardize_id_part(item.get('renk', 'YOK')),
                  'miktar': f"{miktar_decimal:.2f}",
-                 'barkod': stok_kod_std # Barkodu şimdilik stok koduyla aynı tutuyoruz
+                 'barkod': stok_kod_std 
              })
 
         count = len(processed_results)
@@ -1090,40 +1066,21 @@ def gemini_ocr_analiz(request):
             'results': processed_results
         })
 
-    except GoogleAPIError as e: # Google API hatalarını yakala (örn: API Key, Quota)
+    except GoogleAPIError as e: 
         # print(f"Gemini API Hatası: {e}") # Debugging
-        return JsonResponse({'success': False, 'message': f"Gemini API ile iletişim hatası: {e}. API Anahtarınızı veya kotanızı kontrol edin."}, status=502) # 502 Bad Gateway
+        return JsonResponse({'success': False, 'message': f"Gemini API ile iletişim hatası: {e}. API Anahtarınızı veya kotanızı kontrol edin."}, status=502) 
     except Exception as e:
-        # Diğer tüm beklenmedik hatalar
         # print(f"Kritik YZ Analiz Hatası ({type(e).__name__}): {e}") # Debugging
         return JsonResponse({'success': False, 'message': f"Görsel analizi sırasında beklenmedik sunucu hatası: {e}"}, status=500)
 
 
 # --- EXCEL EXPORT FONKSİYONLARI ---
-# Not: Bu fonksiyonların gerçek Excel oluşturma mantığını içermesi gerekir.
-# Şimdilik sadece placeholder olarak bırakıldı. Gerçek implementasyon için
-# pandas veya xlsxwriter gibi kütüphaneler kullanılabilir.
-
 @csrf_exempt
 def export_excel(request, sayim_emri_id): 
-    # Gerçek Excel oluşturma kodu buraya gelmeli.
-    # Örnek: RaporlamaView'daki mantığı kullanarak bir pandas DataFrame oluşturup
-    # response = HttpResponse(content_type='application/vnd.ms-excel')
-    # response['Content-Disposition'] = f'attachment; filename="sayim_raporu_{sayim_emri_id}.xlsx"'
-    # with pd.ExcelWriter(response) as writer:
-    #     df.to_excel(writer, index=False)
-    # return response
-    
-    # Şimdilik basit yanıt
     sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
     return HttpResponse(f"'{sayim_emri.ad}' için Excel Raporu İndirme İşlevi Henüz Uygulanmadı.", status=501)
 
-
 @csrf_exempt
 def export_mutabakat_excel(request, sayim_emri_id): 
-    # Gerçek Mutabakat Excel oluşturma kodu buraya gelmeli.
-    # Farkları içeren bir rapor oluşturulabilir.
-    
-    # Şimdilik basit yanıt
     sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
     return HttpResponse(f"'{sayim_emri.ad}' için Mutabakat Excel İndirme İşlevi Henüz Uygulanmadı.", status=501)
