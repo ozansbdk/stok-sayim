@@ -34,26 +34,13 @@ from PIL import Image
 import pandas as pd
 from PIL import Image, ImageFile
 
+# --- YÖNTEM 1 UYGULANDI: Gemini import try-except kaldırıldı ---
 # Gemini (Google GenAI) Imports
-# Google GenAI kütüphanesi kurulu değilse: pip install google-generativeai
-try:
-    import google.generativeai as genai
-    # Import GenerationConfig and Schema for explicit JSON response
-    from google.generativeai.types import GenerationConfig, Schema, Type 
-    # Hata yakalama için google.api_core.exceptions kullanmak daha standart
-    from google.api_core import exceptions as google_exceptions
-
-except ImportError:
-    genai = None
-    google_exceptions = None
-    # Gerekli tipleri None olarak tanımla ki kod hata vermesin
-    GenerationConfig, Schema, Type = None, None, None 
-    print("UYARI: Google Generative AI kütüphanesi bulunamadı. OCR özelliği çalışmayacak.")
-except AttributeError: # google.generativeai.types import edilemezse
-     genai = None
-     google_exceptions = None
-     GenerationConfig, Schema, Type = None, None, None 
-     print("UYARI: Google Generative AI kütüphanesinin versiyonu uyumsuz olabilir.")
+import google.generativeai as genai
+from google.generativeai.types import GenerationConfig, Schema, Type 
+from google.api_core import exceptions as google_exceptions
+print(">>> Gemini kütüphaneleri başarıyla import edildi.") # Başarılı olursa logda bunu göreceğiz
+# --- YÖNTEM 1 BİTTİ ---
 
 
 # Local Imports
@@ -64,7 +51,9 @@ from .forms import SayimGirisForm
 # --- SABİTLER ---
 # Ortam değişkeninden API anahtarını alıyoruz
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_AVAILABLE = bool(GEMINI_API_KEY and genai) # genai import edilebildi mi kontrolü
+# genai import edilebildi mi kontrolü (try-except kaldırıldığı için şimdi genai her zaman tanımlı olmalı)
+# Eğer import başarısız olursa, kod zaten bu satıra ulaşmadan çökecektir.
+GEMINI_AVAILABLE = bool(GEMINI_API_KEY and genai) 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # --- GÖRÜNÜMLER (VIEWS) ---
@@ -201,27 +190,19 @@ class RaporlamaView(DetailView):
             sayim_detaylari = SayimDetay.objects.filter(sayim_emri=sayim_emri).select_related('benzersiz_malzeme')
             
             # Tüm malzemeleri bir kere çekip, sayılanları map üzerinde toplamak daha verimli
-            # Sadece bu depodaki malzemeleri çekmek daha mantıklı olabilir? Yoksa tüm stok mu raporlanıyor?
-            # Şimdilik tümünü çekiyoruz.
             tum_malzemeler_dict = {m.benzersiz_id: m for m in Malzeme.objects.all()}
             sayilan_miktarlar = {}
             for detay in sayim_detaylari:
-                 # Malzemenin varlığını ve ID'sinin sözlükte olup olmadığını kontrol et
-                 # benzersiz_malzeme None olabilir mi? Evetse kontrol ekle.
                  if hasattr(detay, 'benzersiz_malzeme') and detay.benzersiz_malzeme and hasattr(detay.benzersiz_malzeme, 'benzersiz_id') and detay.benzersiz_malzeme.benzersiz_id in tum_malzemeler_dict:
                      malzeme_id = detay.benzersiz_malzeme.benzersiz_id
-                     # Miktarların Decimal olduğundan emin ol
                      sayilan_stok = detay.sayilan_stok if isinstance(detay.sayilan_stok, Decimal) else Decimal(str(detay.sayilan_stok or '0.0'))
                      sayilan_miktarlar[malzeme_id] = sayilan_miktarlar.get(malzeme_id, Decimal('0.0')) + sayilan_stok
                  else:
-                     # İlişkisiz veya hatalı detay kaydı varsa logla
                      print(f"Uyarı: Raporlamada Sayım Detayı ID {detay.pk} geçersiz malzeme ilişkisine sahip.")
 
             rapor_list = []
-            # Tüm malzemeler üzerinden dönerek raporu oluştur
             for malzeme_id, malzeme in tum_malzemeler_dict.items():
                 sayilan_mik_dec = sayilan_miktarlar.get(malzeme_id, Decimal('0.0'))
-                # Veritabanından gelen değerlerin Decimal olduğundan emin ol
                 sistem_mik_dec = malzeme.sistem_stogu if isinstance(malzeme.sistem_stogu, Decimal) else Decimal(str(malzeme.sistem_stogu or '0.0'))
                 birim_fiyat_dec = malzeme.birim_fiyat if isinstance(malzeme.birim_fiyat, Decimal) else Decimal(str(malzeme.birim_fiyat or '0.0'))
                 
@@ -233,26 +214,21 @@ class RaporlamaView(DetailView):
 
                 if fark_mutlak < Decimal('0.01'):
                     tag = 'tamam'
-                # Hiç sayılmadı durumu: Sistemde var (>0.01), sayımda yok (<0.01)
                 elif sistem_mik_dec > Decimal('0.01') and sayilan_mik_dec < Decimal('0.01'):
                     tag = 'hic_sayilmadi'
-                # Yeni sayıldı durumu: Sistemde yok (<0.01), sayımda var (>0.01)
                 elif sistem_mik_dec < Decimal('0.01') and sayilan_mik_dec > Decimal('0.01'):
-                    tag = 'yeni_sayildi' # Yeni durum eklendi
-                else: # Diğer tüm fark durumları
+                    tag = 'yeni_sayildi' 
+                else: 
                     tag = 'fark_var'
                 
-                # ZeroDivisionError kontrolü
-                mik_yuzde = (mik_fark_dec / sistem_mik_dec) * 100 if sistem_mik_dec > Decimal('0.0') else Decimal('0.0') # Sıfırdan büyükse
-                 # Eğer sistem 0 iken sayım yapıldıysa yüzdeyi sonsuz veya 100% gösterme?
+                mik_yuzde = (mik_fark_dec / sistem_mik_dec) * 100 if sistem_mik_dec > Decimal('0.0') else Decimal('0.0') 
                 if sistem_mik_dec < Decimal('0.01') and sayilan_mik_dec > Decimal('0.01'):
-                     mik_yuzde = Decimal('100.0') # Veya 'Yeni' gibi bir metin? Şimdilik 100%
+                     mik_yuzde = Decimal('100.0') 
 
                 
                 rapor_list.append({
                     'kod': malzeme.malzeme_kodu, 'ad': malzeme.malzeme_adi, 'parti': malzeme.parti_no,
                     'renk': malzeme.renk, 'birim': malzeme.olcu_birimi,
-                    # Depo bilgisini de ekleyelim
                     'depo': malzeme.lokasyon_kodu, 
                     'sistem_mik': f"{sistem_mik_dec:.2f}",
                     'sayilan_mik': f"{sayilan_mik_dec:.2f}",
@@ -262,18 +238,17 @@ class RaporlamaView(DetailView):
                     'tutar_fark': f"{tutar_fark_dec:.2f}",
                     'tag': tag
                 })
-            # Raporu önce fark durumuna, sonra depo koduna, sonra stok koduna göre sırala
             context['rapor_data'] = sorted(rapor_list, key=lambda x: (
-                x['tag'] == 'fark_var' or x['tag'] == 'yeni_sayildi', # Önce farklar ve yeniler (True başa gelir)
-                x['tag'] == 'hic_sayilmadi', # Sonra hiç sayılmayanlar
+                x['tag'] == 'fark_var' or x['tag'] == 'yeni_sayildi', 
+                x['tag'] == 'hic_sayilmadi', 
                 x['depo'], 
                 x['kod'], 
                 x['parti'], 
                 x['renk']
-            ), reverse=True) # Farklı olanları en başa almak için reverse=True
+            ), reverse=True) 
         except Exception as e:
             error_type = type(e).__name__
-            print(f"Raporlama Hatası ({error_type}): {e}") # Debugging için
+            print(f"Raporlama Hatası ({error_type}): {e}") 
             context['hata'] = f"Raporlama verisi çekilirken bir hata oluştu: {e}"
             context['rapor_data'] = []
         return context
@@ -289,7 +264,6 @@ class PerformansAnaliziView(DetailView):
         context = super().get_context_data(**kwargs)
         sayim_emri_id = self.object.pk
         try:
-            # Sadece güncelleme tarihi olanları ve personel adı olanları al
             detaylar = SayimDetay.objects.filter(
                 sayim_emri_id=sayim_emri_id, 
                 guncellenme_tarihi__isnull=False,
@@ -303,12 +277,10 @@ class PerformansAnaliziView(DetailView):
                 context['hata'] = f"Bu emre ait, performans analizi yapılabilecek geçerli sayım kaydı bulunamadı."
                 return context
 
-            # Veriyi personel bazında grupla
             personel_verileri = {}
             for d in detaylar:
                 personel = d['personel_adi']
                 tarih = d['guncellenme_tarihi']
-                # Tarih geçerli bir datetime objesi mi kontrol et (Django otomatik yapar ama garanti)
                 if isinstance(tarih, datetime):
                     if personel not in personel_verileri:
                         personel_verileri[personel] = []
@@ -326,28 +298,23 @@ class PerformansAnaliziView(DetailView):
                     for i in range(1, toplam_kayit):
                         t1 = tarihler[i-1]
                         t2 = tarihler[i]
-                        # Zaman dilimi farkı varsa veya naive ise UTC'ye çevirerek karşılaştır
                         try:
-                             # Django'nun timezone ayarına göre aware yap
                              if timezone.is_naive(t1): t1 = timezone.make_aware(t1)
                              if timezone.is_naive(t2): t2 = timezone.make_aware(t2)
                              fark = (t2 - t1).total_seconds() 
-                             
-                             # Makul farkları al (0sn < fark < 1 saat)
                              if 0 < fark < 3600: 
                                  farklar_sn.append(fark)
-                             # else: print(f"Aykırı fark atlandı: {fark} sn") 
                         except Exception as time_err: 
                              print(f"Uyarı: Zaman farkı hesaplama hatası - {t1} vs {t2} - Hata: {time_err}")
                              continue 
                          
-                    if farklar_sn: # Geçerli fark varsa hesapla
+                    if farklar_sn: 
                         toplam_saniye = sum(farklar_sn)
                         ortalama_sure_sn = toplam_saniye / len(farklar_sn)
                         dakika = int(ortalama_sure_sn // 60)
                         saniye_kalan = int(ortalama_sure_sn % 60)
                         etiket = f"{dakika:02d} dk {saniye_kalan:02d} sn" 
-                    elif toplam_kayit >=2 : # Kayıt var ama geçerli fark yoksa
+                    elif toplam_kayit >=2 : 
                         etiket = 'Aykırı Veri (>1 Saat)'
 
 
@@ -359,7 +326,7 @@ class PerformansAnaliziView(DetailView):
                     'ortalama_sure_sn_raw': ortalama_sure_sn 
                 })
 
-            analiz_list.sort(key=lambda x: x['ortalama_sure_sn_raw']) # Sonsuzlar en sona gider
+            analiz_list.sort(key=lambda x: x['ortalama_sure_sn_raw']) 
             
             for item in analiz_list:
                  if item['ortalama_sure_sn_raw'] == float('inf'):
@@ -371,7 +338,7 @@ class PerformansAnaliziView(DetailView):
             context['analiz_data'] = analiz_list
         except Exception as e:
             error_type = type(e).__name__
-            print(f"Performans Analizi Hatası ({error_type}): {e}") # Debugging için
+            print(f"Performans Analizi Hatası ({error_type}): {e}") 
             context['analiz_data'] = []
             context['hata'] = f"Performans analizi sırasında hata oluştu: {e}"
         return context
@@ -386,18 +353,15 @@ class CanliFarkOzetiView(DetailView):
         context = super().get_context_data(**kwargs)
         sayim_emri = self.object
         try:
-            # İlgili sayım emrine ait toplam sayılan miktarları malzeme bazında al
             sayilan_toplamlar = SayimDetay.objects.filter(sayim_emri=sayim_emri, benzersiz_malzeme__isnull=False)\
                  .values('benzersiz_malzeme__benzersiz_id')\
                  .annotate(toplam_sayilan=Sum('sayilan_stok'))
 
-            # Dictionary: {malzeme_id: toplam_miktar}
             sayilan_miktarlar_dict = {
                  item['benzersiz_malzeme__benzersiz_id']: item['toplam_sayilan'] or Decimal('0.0')
                  for item in sayilan_toplamlar 
             }
 
-            # Tüm malzemeleri grup bilgisiyle birlikte çek
             tum_malzemeler = Malzeme.objects.all().values(
                  'benzersiz_id', 'stok_grup', 'sistem_stogu', 'birim_fiyat'
             )
@@ -522,16 +486,12 @@ def stoklari_onayla_ve_kapat(request, sayim_emri_id):
                 yeni_stok = guncellenecek_stoklar.get(malzeme.benzersiz_id)
                 if yeni_stok is None: skipped_count += 1; continue
                 try: 
-                    # Gelen değer zaten Decimal olmalı (Sum('sayilan_stok') DecimalField üzerinden)
                     yeni_stok_dec = yeni_stok if isinstance(yeni_stok, Decimal) else Decimal(str(yeni_stok))
                 except: 
                     skipped_count += 1; continue
                 
-                # Malzeme.sistem_stogu da artık Decimal, doğrudan karşılaştırılabilir
                 if malzeme.sistem_stogu != yeni_stok_dec:
                     malzeme.sistem_stogu = yeni_stok_dec
-                    # birim_fiyat ve sistem_tutari artık models.py içindeki save() metodunda
-                    # otomatik hesaplanıyor.
                     malzeme.save(update_fields=['sistem_stogu', 'sistem_tutari']) 
                     updated_count +=1
                 else: 
@@ -582,26 +542,21 @@ def upload_and_reload_stok_data(request):
             
             df.columns = df.columns.str.strip() 
             
-            # ⭐ DÜZELTME 1: 'seri_no' (veya barkod) sütununu zorunlu alanlara ekle
-            # Excel'deki tam sütun adını yazdığınızdan emin olun
             required_cols = ["Stok Kodu", "Depo Kodu", "Miktar", "Maliyet birim", "seri_no"]
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols: 
-                # seri_no yoksa uyar ama devam et, barkod varsa onu kullan
                 if 'seri_no' in missing_cols and 'barkod' in df.columns:
-                    df['seri_no'] = df['barkod'] # barkod'u seri_no olarak kullan
+                    df['seri_no'] = df['barkod'] 
                     print("Uyarı: 'seri_no' sütunu yok, 'barkod' sütunu 'seri_no' olarak kullanılacak.")
-                    missing_cols.remove('seri_no') # Listeden çıkar
+                    missing_cols.remove('seri_no') 
                 
-                # Hala eksik sütun varsa hata ver
                 if missing_cols:
                     return JsonResponse({'success': False, 'message': f'Eksik sütunlar: {", ".join(missing_cols)}'}, status=400)
 
-            # ⭐ DÜZELTME 1.1: 'seri_no' için de bir default ekle
             defaults = {
                 "Parti": 'YOK', "Renk": 'YOK', "Depo Kodu": 'MERKEZ', 
                 "Miktar": '0.0', "Maliyet birim": '0.0', "Grup": 'GENEL', 
-                "Stok Adı": '', "Birim": 'ADET', "seri_no": 'YOK' # Eklendi
+                "Stok Adı": '', "Birim": 'ADET', "seri_no": 'YOK' 
             }
             for col, dv in defaults.items():
                  if col not in df.columns: df[col] = dv
@@ -617,7 +572,7 @@ def upload_and_reload_stok_data(request):
                      if not sk or sk == 'YOK': raise ValueError(f"Stok Kodu boş.")
                      if not dk or dk == 'YOK': raise ValueError(f"Depo Kodu boş.")
                      ms, cs = str(m).replace(',', '.').strip() or '0.0', str(c).replace(',', '.').strip() or '0.0'
-                     md, cd = Decimal(ms), Decimal(cs) # models.py'de DecimalField'e geçildiği için bu doğru
+                     md, cd = Decimal(ms), Decimal(cs) 
                      pr = {col: str(row[col]) for col in df.columns if col not in ['Miktar', 'Maliyet birim']}
                      pr['Miktar'], pr['Maliyet birim'] = md, cd
                      processed_rows.append(pr)
@@ -628,9 +583,6 @@ def upload_and_reload_stok_data(request):
                  
             created_count, updated_count, fail_count = 0, 0, 0
             with transaction.atomic():
-                # ESKİ MALZEMELERİ SİLME (OPSİYONEL AMA TEMİZLİK İÇİN İYİ)
-                # Malzeme.objects.all().delete() 
-                # print("Eski tüm malzeme kayıtları silindi.")
                 
                 for index, rd in enumerate(processed_rows): 
                     rn = index + 2
@@ -641,8 +593,6 @@ def upload_and_reload_stok_data(request):
                         sm, bf = rd['Miktar'], rd['Maliyet birim']
                         sg, sa, birim = rd['Grup'] or 'GENEL', rd['Stok Adı'] or f"Stok {sk}", rd['Birim'] or 'ADET'
                         
-                        # ⭐ DÜZELTME 1.2: 'seri_no'yu defaults'a ekle
-                        # Excel'den gelen 'seri_no' (veya 'barkod') değerini al
                         seri_no_val = standardize_id_part(rd.get('seri_no', 'YOK')) 
                         
                         _, created = Malzeme.objects.update_or_create(
@@ -655,10 +605,9 @@ def upload_and_reload_stok_data(request):
                                 'lokasyon_kodu': lk, 
                                 'olcu_birimi': birim, 
                                 'stok_grup': sg, 
-                                'seri_no': seri_no_val, # EKLENDİ
+                                'seri_no': seri_no_val, 
                                 'sistem_stogu': sm, 
                                 'birim_fiyat': bf
-                                # sistem_tutari models.py'deki save() metodunda otomatik hesaplanıyor
                             }
                         )
                         if created: created_count += 1
@@ -679,7 +628,6 @@ def get_last_sayim_info(malzeme_nesnesi):
 
 @csrf_exempt
 def ajax_akilli_stok_ara(request):
-    # Standardize edilmiş değerleri al
     seri_no, stok_kod, parti_no, renk, depo_kod = map(standardize_id_part, [
         request.GET.get('seri_no', 'YOK'), request.GET.get('stok_kod', 'YOK'),
         request.GET.get('parti_no', 'YOK'), request.GET.get('renk', 'YOK'), 
@@ -692,19 +640,16 @@ def ajax_akilli_stok_ara(request):
     malzeme = None 
     if depo_kod == 'YOK': response_data['urun_bilgi'] = 'HATA: Depo Kodu Yok.'; print(">> HATA: Depo Kodu Yok."); return JsonResponse(response_data, status=400)
 
-    # ⭐ DÜZELTME 2: Seri No sorgusu güncellendi
-    # 1. Seri No / Barkod (benzersiz_id, malzeme_kodu VEYA seri_no)
     if seri_no != 'YOK':
         print(f">> 1: Seri ({seri_no})")
         malzeme = Malzeme.objects.filter(
             Q(benzersiz_id=seri_no) | 
             Q(malzeme_kodu__iexact=seri_no) |
-            Q(seri_no__iexact=seri_no), # EKLENDİ
+            Q(seri_no__iexact=seri_no), 
             lokasyon_kodu__iexact=depo_kod
         ).first()
         print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
 
-    # 2. Parti No (Stok Kodu varsa onunla, yoksa tek başına)
     if not malzeme and parti_no != 'YOK':
         print(f">> 2: Parti ({parti_no}), Stok ({stok_kod})")
         q = {'parti_no__iexact': parti_no, 'lokasyon_kodu__iexact': depo_kod}
@@ -712,13 +657,11 @@ def ajax_akilli_stok_ara(request):
         malzeme = Malzeme.objects.filter(**q).first() 
         print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
 
-    # 3. Stok Kodu + Parti + Renk (Tam eşleşme)
     if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
         print(f">> 3: Stok ({stok_kod}), Parti ({parti_no}), Renk ({renk})")
         malzeme = Malzeme.objects.filter(malzeme_kodu__iexact=stok_kod, parti_no__iexact=parti_no, renk__iexact=renk, lokasyon_kodu__iexact=depo_kod).first()
         print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
 
-    # 4. Sadece Stok Kodu (Varyantları listele)
     if not malzeme and stok_kod != 'YOK':
         print(f">> 4: Stok ({stok_kod}) Varyantları")
         varyantlar = Malzeme.objects.filter(malzeme_kodu__iexact=stok_kod, lokasyon_kodu__iexact=depo_kod)
@@ -734,14 +677,12 @@ def ajax_akilli_stok_ara(request):
             print(f"      -> Varyant listesi döndürülüyor."); print(f"--- ARAMA BİTTİ (Varyant) ---")
             return JsonResponse(response_data) 
             
-    # Sonuç
     if malzeme:
         print(f">> SONUÇ: Bulundu: {malzeme.benzersiz_id}. Detaylar işleniyor...")
         ts = Decimal('0.0') 
         seid_str = request.GET.get('sayim_emri_id') 
         if seid_str:
             try: 
-                # models.py'de DecimalField'e geçildiği için Sum sonucu zaten Decimal olacak
                 ts = SayimDetay.objects.filter(sayim_emri_id=int(seid_str), benzersiz_malzeme=malzeme).aggregate(t=Sum('sayilan_stok'))['t'] or Decimal('0.0')
             except: pass 
         print(f"   -> Bu sayım toplamı: {ts:.2f}")
@@ -749,7 +690,6 @@ def ajax_akilli_stok_ara(request):
         fdu = f"⚠️ Başka depolarda: {', '.join(sorted([standardize_id_part(d) for d in dd]))}" if dd.exists() else ""
         if fdu: print(f"   -> Farklı depo uyarısı var.")
         
-        # models.py'de DecimalField'e geçildi, .f2 formatlaması aynı kalabilir
         response_data.update({
             'found': True, 
             'benzersiz_id': malzeme.benzersiz_id, 
@@ -765,7 +705,6 @@ def ajax_akilli_stok_ara(request):
         print(f"--- ARAMA BİTTİ (Başarılı) ---")
         return JsonResponse(response_data)
         
-    # Bulunamadı
     aranan = seri_no if seri_no != 'YOK' else (parti_no if parti_no != 'YOK' else stok_kod)
     response_data['urun_bilgi'] = f"'{aranan}' bilgisi ile '{depo_kod}' deposunda bulunamadı."
     print(f">> SONUÇ: Bulunamadı.")
@@ -784,7 +723,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 print(">> HATA: Benzersiz ID yok.")
                 return JsonResponse({'success': False, 'message': "HATA: Ürün ID eksik."}, status=400)
             
-            # --- DÜZELTME BAŞLANGICI ---
+            # --- YENİ (DÜZELTİLMİŞ) KOD ---
             try:
                 # Gelen miktar string'ini al, temizle
                 miktar_str = str(data.get('miktar', '0.0')).replace(',', '.').strip()
@@ -804,7 +743,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 # Eğer Decimal'e çevrilemezse (örn: "abc" gelirse)
                 print(f">> HATA: Miktar ({data.get('miktar')}) geçersiz: {e}")
                 return JsonResponse({'success': False, 'message': f"HATA: Geçersiz miktar formatı."}, status=400)
-            # --- DÜZELTME BİTTİ ---
+            # --- YENİ KOD BİTİŞİ ---
             
             pa = data.get('personel_adi', 'MISAFIR').strip().upper() or 'MISAFIR'
             lat, lon = str(data.get('lat', 'YOK')), str(data.get('lon', 'YOK'))
@@ -825,7 +764,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 sayim_emri=se, 
                 benzersiz_malzeme=malzeme,
                 personel_adi=pa, 
-                sayilan_stok=m, # Decimal olarak kaydedilecek
+                sayilan_stok=m, 
                 latitude=lat, 
                 longitude=lon
             )
@@ -854,24 +793,34 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
 @csrf_exempt
 @require_POST
 def gemini_ocr_analiz(request):
-    if not GEMINI_AVAILABLE: return JsonResponse({'success': False, 'message': "Gemini aktif değil."}, status=501) 
-    if 'image_file' not in request.FILES: return JsonResponse({'success': False, 'message': "Dosya yüklenmedi."}, status=400)
+    # try-except kaldırıldığı için, eğer kütüphane import edilemezse kod buraya hiç gelmeyecek.
+    # Bu yüzden GEMINI_AVAILABLE kontrolünü API anahtarı üzerinden yapmak yeterli.
+    if not GEMINI_API_KEY: 
+        print(">> Gemini API Anahtarı bulunamadı (Environment Variable eksik?).")
+        return JsonResponse({'success': False, 'message': "Gemini API anahtarı ayarlanmamış."}, status=503) # Service Unavailable daha uygun
+        
+    if 'image_file' not in request.FILES: 
+        return JsonResponse({'success': False, 'message': "Dosya yüklenmedi."}, status=400)
+        
     try:
         img_file = request.FILES['image_file']
-        if img_file.size > 5*1024*1024: return JsonResponse({'success': False, 'message': "Dosya > 5MB."}, status=413) 
-        try: img = Image.open(BytesIO(img_file.read()))
-        except Exception as img_err: print(f"OCR Resim Açma Hatası: {img_err}"); return JsonResponse({'success': False, 'message': f"Resim açılamadı: {img_err}"}, status=400)
+        if img_file.size > 5*1024*1024: 
+            return JsonResponse({'success': False, 'message': "Dosya > 5MB."}, status=413) 
+            
+        try: 
+            img = Image.open(BytesIO(img_file.read()))
+        except Exception as img_err: 
+            print(f"OCR Resim Açma Hatası: {img_err}")
+            return JsonResponse({'success': False, 'message': f"Resim açılamadı: {img_err}"}, status=400)
         
         genai.configure(api_key=GEMINI_API_KEY) 
         
-        # ⭐ DÜZELTME 3: Model adı 'gemini-2.0-flash' olarak güncellendi
         model_name = 'gemini-2.0-flash' 
         model = genai.GenerativeModel(model_name) 
         
         system_instruction = ("Extract 'stok_kod', 'parti_no', 'renk', 'miktar' from labels. Use 'YOK' if missing. Quantity ('miktar') as decimal (e.g., 1.0). Respond ONLY with JSON list.")
         prompt = ("Analyze labels, create JSON list with 'stok_kod', 'parti_no', 'renk', 'miktar'. Quantity as decimal.")
         
-        # --- Config'i tekrar ekledik ---
         generation_config = GenerationConfig(
             response_mime_type="application/json", 
             response_schema=Schema(
@@ -890,42 +839,56 @@ def gemini_ocr_analiz(request):
         )
         
         print(f"Gemini API Çağrısı: Model={model_name}")
-        response = model.generate_content([prompt, img], generation_config=generation_config) # Config ile çağır
+        response = model.generate_content([prompt, img], generation_config=generation_config) 
         print("Gemini Yanıtı Alındı.")
         
         try:
             json_text = response.text 
             json_results = json.loads(json_text.strip()) 
-            if not isinstance(json_results, list): raise json.JSONDecodeError("Liste bekleniyordu.", json_text, 0)
+            if not isinstance(json_results, list): 
+                raise json.JSONDecodeError("Liste bekleniyordu.", json_text, 0)
             print(f"Gemini Yanıt Parse Edildi: {len(json_results)} sonuç.")
-        except Exception as json_err: print(f"Gemini JSON Hatası: {json_err}. Yanıt: '{response.text}'"); return JsonResponse({'success': False, 'message': f"YZ yanıtı işlenemedi."}, status=500)
+        except Exception as json_err: 
+            print(f"Gemini JSON Hatası: {json_err}. Yanıt: '{response.text}'")
+            return JsonResponse({'success': False, 'message': f"YZ yanıtı işlenemedi."}, status=500)
 
         processed = []
         print("OCR Sonuçları İşleniyor...")
         for i, item in enumerate(json_results):
-             if not isinstance(item, dict): print(f"   -> {i+1} atlandı (dict değil)."); continue 
+             if not isinstance(item, dict): 
+                 print(f"   -> {i+1} atlandı (dict değil)."); continue 
              try:
                  mr = item.get('miktar', '0.0'); md = Decimal('0.0')
                  if isinstance(mr, (int, float)): md = Decimal(mr)
                  elif isinstance(mr, str): ms = mr.replace(',', '.').strip().upper(); md = Decimal(ms) if ms and ms != 'YOK' else Decimal('0.0')
-             except: print(f"   -> {i+1}: Miktar ('{mr}') geçersiz, 1.0 kullanıldı."); md = Decimal('1.0') 
+             except: 
+                 print(f"   -> {i+1}: Miktar ('{mr}') geçersiz, 1.0 kullanıldı."); md = Decimal('1.0') 
+                 
              sk = standardize_id_part(item.get('stok_kod', 'YOK'))
-             if sk == 'YOK': print(f"   -> {i+1} atlandı (Stok Kodu YOK)."); continue 
-             processed.append({'stok_kod': sk, 'parti_no': standardize_id_part(item.get('parti_no', 'YOK')), 'renk': standardize_id_part(item.get('renk', 'YOK')), 'miktar': f"{md:.2f}", 'barkod': sk })
+             if sk == 'YOK': 
+                 print(f"   -> {i+1} atlandı (Stok Kodu YOK)."); continue 
+                 
+             processed.append({
+                 'stok_kod': sk, 
+                 'parti_no': standardize_id_part(item.get('parti_no', 'YOK')), 
+                 'renk': standardize_id_part(item.get('renk', 'YOK')), 
+                 'miktar': f"{md:.2f}", 
+                 'barkod': sk # Barkod olarak stok kodunu varsayıyoruz
+             })
              print(f"   -> {i+1} işlendi: Stok={sk}, Miktar={md:.2f}")
 
         c = len(processed)
-        if c == 0: print("OCR SONUÇ: Geçerli etiket yok."); return JsonResponse({'success': True, 'message': "Geçerli etiket bulunamadı.", 'count': 0, 'results': []})
-        print(f"OCR SONUÇ: {c} geçerli etiket."); return JsonResponse({'success': True, 'message': f"✅ {c} etiket okundu.", 'count': c, 'results': processed})
+        if c == 0: 
+            print("OCR SONUÇ: Geçerli etiket yok.")
+            return JsonResponse({'success': True, 'message': "Geçerli etiket bulunamadı.", 'count': 0, 'results': []})
+            
+        print(f"OCR SONUÇ: {c} geçerli etiket.")
+        return JsonResponse({'success': True, 'message': f"✅ {c} etiket okundu.", 'count': c, 'results': processed})
 
-    # --- SyntaxError Düzeltmesi UYGULANDI ---
-    # except bloğunu doğru şekilde ayır
-    except google_exceptions.GoogleAPICallError as e: # Önce spesifik Google hatasını yakala (google_exceptions import edildi)
+    except google_exceptions.GoogleAPICallError as e: 
         print(f"Gemini API Hatası: {e}") 
         error_detail = str(e)
-        # Kullanıcıya daha anlamlı mesajlar ver
         user_message = f"Gemini API ile iletişim hatası oluştu. Lütfen API anahtarınızı, kotanızı veya model adını kontrol edin."
-        # Hata tiplerini daha doğru kontrol et (varsa)
         if isinstance(e, google_exceptions.PermissionDenied) or "API key not valid" in error_detail:
              user_message = "Gemini API anahtarı geçersiz veya yetki sorunu. Yönetici ile iletişime geçin."
         elif isinstance(e, google_exceptions.ResourceExhausted) or "quota" in error_detail.lower():
@@ -934,12 +897,11 @@ def gemini_ocr_analiz(request):
              user_message = f"Kullanılan Gemini modeli ('{model_name}') bulunamadı veya bu işlem için desteklenmiyor."
         elif isinstance(e, google_exceptions.InvalidArgument):
              user_message = f"Gemini API'ye geçersiz bir argüman gönderildi: {e}"
-        # Diğer 4xx/5xx hataları
-        elif hasattr(e, 'message'): # Genel Google API hatası
+        elif hasattr(e, 'message'): 
              user_message = f"Gemini API Hatası: {e.message}"
              
-        return JsonResponse({'success': False, 'message': user_message}, status=502) # Bad Gateway daha uygun
-    except Exception as e: # Sonra diğer genel hataları yakala
+        return JsonResponse({'success': False, 'message': user_message}, status=502) 
+    except Exception as e: 
         error_type = type(e).__name__
         print(f"Kritik YZ Analiz Hatası ({error_type}): {e}") 
         return JsonResponse({'success': False, 'message': f"Görsel analizi sırasında beklenmedik sunucu hatası ({error_type})."}, status=500)
