@@ -34,12 +34,12 @@ from PIL import Image
 import pandas as pd
 from PIL import Image, ImageFile
 
-# --- YÖNTEM 1 UYGULANDI: Gemini import try-except kaldırıldı ---
+# --- YÖNTEM 1 (TEŞHİS İÇİN): 'types' import'u devre dışı bırakıldı ---
 # Gemini (Google GenAI) Imports
 import google.generativeai as genai
-from google.generativeai.types import GenerationConfig, Schema, Type 
+# from google.generativeai.types import GenerationConfig, Schema, Type # <-- GEÇİCİ OLARAK DEVRE DIŞI BIRAKILDI
 from google.api_core import exceptions as google_exceptions
-print(">>> Gemini kütüphaneleri başarıyla import edildi.") # Başarılı olursa logda bunu göreceğiz
+print(">>> google.generativeai başarıyla import edildi.") # <-- Mesaj güncellendi
 # --- YÖNTEM 1 BİTTİ ---
 
 
@@ -51,8 +51,7 @@ from .forms import SayimGirisForm
 # --- SABİTLER ---
 # Ortam değişkeninden API anahtarını alıyoruz
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-# genai import edilebildi mi kontrolü (try-except kaldırıldığı için şimdi genai her zaman tanımlı olmalı)
-# Eğer import başarısız olursa, kod zaten bu satıra ulaşmadan çökecektir.
+# genai import edilebildi mi kontrolü (types importu kaldırıldığı için genai tanımlı olmalı)
 GEMINI_AVAILABLE = bool(GEMINI_API_KEY and genai) 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -128,10 +127,8 @@ class DepoSecimView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         sayim_emri_id = kwargs['sayim_emri_id']
-        # Depo kodlarını alırken boş veya None olanları filtrele ve standardize et
         lokasyon_listesi = Malzeme.objects.exclude(lokasyon_kodu__isnull=True).exclude(lokasyon_kodu__exact='')\
                                          .values_list('lokasyon_kodu', flat=True).distinct()
-        # Standardize edilmiş ve boş olmayanları al, sonra sırala
         context['lokasyonlar'] = sorted([std_loc for loc in lokasyon_listesi if (std_loc := standardize_id_part(loc)) and std_loc != 'YOK'])
         context['sayim_emri_id'] = sayim_emri_id
         return context
@@ -146,15 +143,13 @@ class SayimGirisView(DetailView):
     
     def get_object(self, queryset=None):
         pk = self.kwargs.get(self.pk_url_kwarg)
-        depo_kodu_url = self.kwargs.get(self.slug_url_kwarg) # URL'den depo kodunu al
+        depo_kodu_url = self.kwargs.get(self.slug_url_kwarg) 
         if pk is None:
             raise Http404(_("Sayım Emri ID'si URL'de bulunamadı."))
         if queryset is None:
             queryset = self.get_queryset()
         try:
-            # Sayım emrini al
             obj = queryset.get(pk=pk)
-            # Depo kodunu urlden alıp, decode edip standardize et
             from urllib.parse import unquote
             self.standardized_depo_kodu = standardize_id_part(unquote(depo_kodu_url)) if depo_kodu_url else 'YOK'
             print(f"SayimGirisView - Gelen Depo URL: {depo_kodu_url}, Standardize: {self.standardized_depo_kodu}") 
@@ -165,12 +160,9 @@ class SayimGirisView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['sayim_emri_id'] = self.object.pk 
-        # View içinde standardize edilmiş depo kodunu context'e aktar
         context['depo_kodu'] = self.standardized_depo_kodu 
         context['personel_adi'] = self.request.session.get('current_user', 'MISAFIR')
         context['gemini_available'] = GEMINI_AVAILABLE
-        # SayimGirisForm tanımlıysa ve kullanılıyorsa:
-        # from .forms import SayimGirisForm # import yukarıda olmalı
         context['form'] = SayimGirisForm() 
         return context
 
@@ -178,18 +170,15 @@ class SayimGirisView(DetailView):
 
 class RaporlamaView(DetailView):
     model = SayimEmri
-    pk_url_kwarg = 'sayim_emri_id' # URL'den gelen ID'nin adını belirtiyoruz
+    pk_url_kwarg = 'sayim_emri_id' 
     template_name = 'sayim/raporlama.html'
     context_object_name = 'sayim_emri'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        sayim_emri = self.object # DetailView objeyi self.object olarak sağlar
+        sayim_emri = self.object 
         try:
-            # Sadece ilgili sayım emrine ait detayları çek
             sayim_detaylari = SayimDetay.objects.filter(sayim_emri=sayim_emri).select_related('benzersiz_malzeme')
-            
-            # Tüm malzemeleri bir kere çekip, sayılanları map üzerinde toplamak daha verimli
             tum_malzemeler_dict = {m.benzersiz_id: m for m in Malzeme.objects.all()}
             sayilan_miktarlar = {}
             for detay in sayim_detaylari:
@@ -224,7 +213,6 @@ class RaporlamaView(DetailView):
                 mik_yuzde = (mik_fark_dec / sistem_mik_dec) * 100 if sistem_mik_dec > Decimal('0.0') else Decimal('0.0') 
                 if sistem_mik_dec < Decimal('0.01') and sayilan_mik_dec > Decimal('0.01'):
                      mik_yuzde = Decimal('100.0') 
-
                 
                 rapor_list.append({
                     'kod': malzeme.malzeme_kodu, 'ad': malzeme.malzeme_adi, 'parti': malzeme.parti_no,
@@ -241,10 +229,7 @@ class RaporlamaView(DetailView):
             context['rapor_data'] = sorted(rapor_list, key=lambda x: (
                 x['tag'] == 'fark_var' or x['tag'] == 'yeni_sayildi', 
                 x['tag'] == 'hic_sayilmadi', 
-                x['depo'], 
-                x['kod'], 
-                x['parti'], 
-                x['renk']
+                x['depo'], x['kod'], x['parti'], x['renk']
             ), reverse=True) 
         except Exception as e:
             error_type = type(e).__name__
@@ -316,7 +301,6 @@ class PerformansAnaliziView(DetailView):
                         etiket = f"{dakika:02d} dk {saniye_kalan:02d} sn" 
                     elif toplam_kayit >=2 : 
                         etiket = 'Aykırı Veri (>1 Saat)'
-
 
                 analiz_list.append({
                     'personel': personel,
@@ -598,16 +582,9 @@ def upload_and_reload_stok_data(request):
                         _, created = Malzeme.objects.update_or_create(
                             benzersiz_id=bid, 
                             defaults={
-                                'malzeme_kodu': sk, 
-                                'malzeme_adi': sa, 
-                                'parti_no': pn, 
-                                'renk': rk, 
-                                'lokasyon_kodu': lk, 
-                                'olcu_birimi': birim, 
-                                'stok_grup': sg, 
-                                'seri_no': seri_no_val, 
-                                'sistem_stogu': sm, 
-                                'birim_fiyat': bf
+                                'malzeme_kodu': sk, 'malzeme_adi': sa, 'parti_no': pn, 'renk': rk, 
+                                'lokasyon_kodu': lk, 'olcu_birimi': birim, 'stok_grup': sg, 
+                                'seri_no': seri_no_val, 'sistem_stogu': sm, 'birim_fiyat': bf
                             }
                         )
                         if created: created_count += 1
@@ -643,9 +620,7 @@ def ajax_akilli_stok_ara(request):
     if seri_no != 'YOK':
         print(f">> 1: Seri ({seri_no})")
         malzeme = Malzeme.objects.filter(
-            Q(benzersiz_id=seri_no) | 
-            Q(malzeme_kodu__iexact=seri_no) |
-            Q(seri_no__iexact=seri_no), 
+            Q(benzersiz_id=seri_no) | Q(malzeme_kodu__iexact=seri_no) | Q(seri_no__iexact=seri_no), 
             lokasyon_kodu__iexact=depo_kod
         ).first()
         print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
@@ -691,16 +666,11 @@ def ajax_akilli_stok_ara(request):
         if fdu: print(f"   -> Farklı depo uyarısı var.")
         
         response_data.update({
-            'found': True, 
-            'benzersiz_id': malzeme.benzersiz_id, 
+            'found': True, 'benzersiz_id': malzeme.benzersiz_id, 
             'urun_bilgi': f"{malzeme.malzeme_adi} ({malzeme.malzeme_kodu}) P:{malzeme.parti_no} R:{malzeme.renk}", 
-            'stok_kod': malzeme.malzeme_kodu, 
-            'parti_no': malzeme.parti_no, 
-            'renk': malzeme.renk, 
-            'sistem_stok': f"{malzeme.sistem_stogu:.2f}", 
-            'sayilan_stok': f"{ts:.2f}", 
-            'last_sayim': get_last_sayim_info(malzeme) or 'Yok', 
-            'farkli_depo_uyarisi': fdu
+            'stok_kod': malzeme.malzeme_kodu, 'parti_no': malzeme.parti_no, 'renk': malzeme.renk, 
+            'sistem_stok': f"{malzeme.sistem_stogu:.2f}", 'sayilan_stok': f"{ts:.2f}", 
+            'last_sayim': get_last_sayim_info(malzeme) or 'Yok', 'farkli_depo_uyarisi': fdu
         })
         print(f"--- ARAMA BİTTİ (Başarılı) ---")
         return JsonResponse(response_data)
@@ -723,27 +693,16 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 print(">> HATA: Benzersiz ID yok.")
                 return JsonResponse({'success': False, 'message': "HATA: Ürün ID eksik."}, status=400)
             
-            # --- YENİ (DÜZELTİLMİŞ) KOD ---
             try:
-                # Gelen miktar string'ini al, temizle
                 miktar_str = str(data.get('miktar', '0.0')).replace(',', '.').strip()
-                
-                # Eğer miktar_str boşsa ('') veya None ise, '0.0' olarak ayarla
-                if not miktar_str:
-                    miktar_str = '0.0'
-                    
-                m = Decimal(miktar_str) # Şimdi Decimal'e çevir
-                
+                if not miktar_str: miktar_str = '0.0'
+                m = Decimal(miktar_str) 
                 if m <= Decimal('0.0'): 
-                    # 0 veya eksi miktar gelirse hata ver
                     print(f">> HATA: Miktar ({m}) pozitif olmalı.")
                     return JsonResponse({'success': False, 'message': f"HATA: Miktar pozitif olmalı."}, status=400)
-                    
             except Exception as e: 
-                # Eğer Decimal'e çevrilemezse (örn: "abc" gelirse)
                 print(f">> HATA: Miktar ({data.get('miktar')}) geçersiz: {e}")
                 return JsonResponse({'success': False, 'message': f"HATA: Geçersiz miktar formatı."}, status=400)
-            # --- YENİ KOD BİTİŞİ ---
             
             pa = data.get('personel_adi', 'MISAFIR').strip().upper() or 'MISAFIR'
             lat, lon = str(data.get('lat', 'YOK')), str(data.get('lon', 'YOK'))
@@ -761,12 +720,8 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             print(f">> Detay Oluşturuluyor: Miktar={m}, Personel={pa}...")
             
             SayimDetay.objects.create(
-                sayim_emri=se, 
-                benzersiz_malzeme=malzeme,
-                personel_adi=pa, 
-                sayilan_stok=m, 
-                latitude=lat, 
-                longitude=lon
+                sayim_emri=se, benzersiz_malzeme=malzeme, personel_adi=pa, 
+                sayilan_stok=m, latitude=lat, longitude=lon
             )
             print("   -> Oluşturuldu.")
             
@@ -793,11 +748,9 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
 @csrf_exempt
 @require_POST
 def gemini_ocr_analiz(request):
-    # try-except kaldırıldığı için, eğer kütüphane import edilemezse kod buraya hiç gelmeyecek.
-    # Bu yüzden GEMINI_AVAILABLE kontrolünü API anahtarı üzerinden yapmak yeterli.
     if not GEMINI_API_KEY: 
         print(">> Gemini API Anahtarı bulunamadı (Environment Variable eksik?).")
-        return JsonResponse({'success': False, 'message': "Gemini API anahtarı ayarlanmamış."}, status=503) # Service Unavailable daha uygun
+        return JsonResponse({'success': False, 'message': "Gemini API anahtarı ayarlanmamış."}, status=503) 
         
     if 'image_file' not in request.FILES: 
         return JsonResponse({'success': False, 'message': "Dosya yüklenmedi."}, status=400)
@@ -818,39 +771,61 @@ def gemini_ocr_analiz(request):
         model_name = 'gemini-2.0-flash' 
         model = genai.GenerativeModel(model_name) 
         
-        system_instruction = ("Extract 'stok_kod', 'parti_no', 'renk', 'miktar' from labels. Use 'YOK' if missing. Quantity ('miktar') as decimal (e.g., 1.0). Respond ONLY with JSON list.")
         prompt = ("Analyze labels, create JSON list with 'stok_kod', 'parti_no', 'renk', 'miktar'. Quantity as decimal.")
         
-        generation_config = GenerationConfig(
-            response_mime_type="application/json", 
-            response_schema=Schema(
-                type=Type.ARRAY, 
-                items=Schema(
-                    type=Type.OBJECT, 
-                    properties={
-                        'stok_kod': Schema(type=Type.STRING), 
-                        'parti_no': Schema(type=Type.STRING), 
-                        'renk': Schema(type=Type.STRING), 
-                        'miktar': Schema(type=Type.NUMBER)
-                    }, 
-                    required=['stok_kod']
-                )
-            )
-        )
+        # --- TEŞHİS İÇİN GenerationConfig GEÇİCİ OLARAK KALDIRILDI ---
+        # generation_config = GenerationConfig(
+        #     response_mime_type="application/json", 
+        #     response_schema=Schema( # Bu satır hata veriyordu
+        #         type=Type.ARRAY, 
+        #         items=Schema(
+        #             type=Type.OBJECT, 
+        #             properties={
+        #                 'stok_kod': Schema(type=Type.STRING), 
+        #                 'parti_no': Schema(type=Type.STRING), 
+        #                 'renk': Schema(type=Type.STRING), 
+        #                 'miktar': Schema(type=Type.NUMBER)
+        #             }, 
+        #             required=['stok_kod']
+        #         )
+        #     )
+        # )
         
         print(f"Gemini API Çağrısı: Model={model_name}")
-        response = model.generate_content([prompt, img], generation_config=generation_config) 
+        # response = model.generate_content([prompt, img], generation_config=generation_config) # Config olmadan çağır
+        response = model.generate_content([prompt, img]) # Config olmadan çağırıyoruz
         print("Gemini Yanıtı Alındı.")
         
+        # Yanıt JSON formatında olmayabilir, manuel parse etmeyi deneyelim
         try:
             json_text = response.text 
-            json_results = json.loads(json_text.strip()) 
+            # Bazen başında/sonunda ```json ... ``` olabilir, temizleyelim
+            if json_text.strip().startswith("```json"):
+                 json_text = json_text.strip()[7:-3].strip()
+            elif json_text.strip().startswith("```"):
+                 json_text = json_text.strip()[3:-3].strip()
+                 
+            json_results = json.loads(json_text) 
+            
+            # Eğer tek bir dict döndürdüyse listeye çevir
+            if isinstance(json_results, dict):
+                json_results = [json_results]
+                
             if not isinstance(json_results, list): 
                 raise json.JSONDecodeError("Liste bekleniyordu.", json_text, 0)
+                
             print(f"Gemini Yanıt Parse Edildi: {len(json_results)} sonuç.")
-        except Exception as json_err: 
+            
+        except (json.JSONDecodeError, AttributeError) as json_err: # AttributeError ekledik
             print(f"Gemini JSON Hatası: {json_err}. Yanıt: '{response.text}'")
-            return JsonResponse({'success': False, 'message': f"YZ yanıtı işlenemedi."}, status=500)
+            # Yanıt metnini ham olarak göndermeyi deneyelim
+            processed_text = [{'stok_kod': response.text, 'parti_no': 'YOK', 'renk': 'YOK', 'miktar': '1.00', 'barkod': 'TEXT'}]
+            print("OCR SONUÇ: JSON parse edilemedi, ham metin döndürülüyor.")
+            return JsonResponse({'success': True, 'message': "⚠️ YZ yanıtı JSON değildi.", 'count': 1, 'results': processed_text})
+        except Exception as e: # Diğer beklenmedik hatalar
+            print(f"Gemini Yanıt İşleme Hatası: {e}. Yanıt: '{response.text}'")
+            return JsonResponse({'success': False, 'message': f"YZ yanıtı işlenemedi: {e}"}, status=500)
+
 
         processed = []
         print("OCR Sonuçları İşleniyor...")
@@ -861,6 +836,8 @@ def gemini_ocr_analiz(request):
                  mr = item.get('miktar', '0.0'); md = Decimal('0.0')
                  if isinstance(mr, (int, float)): md = Decimal(mr)
                  elif isinstance(mr, str): ms = mr.replace(',', '.').strip().upper(); md = Decimal(ms) if ms and ms != 'YOK' else Decimal('0.0')
+                 # Eğer miktar hala 0 ise, 1 yapalım (OCR'da genelde 1 adet olur)
+                 if md <= Decimal('0.0'): md = Decimal('1.0')
              except: 
                  print(f"   -> {i+1}: Miktar ('{mr}') geçersiz, 1.0 kullanıldı."); md = Decimal('1.0') 
                  
@@ -873,7 +850,7 @@ def gemini_ocr_analiz(request):
                  'parti_no': standardize_id_part(item.get('parti_no', 'YOK')), 
                  'renk': standardize_id_part(item.get('renk', 'YOK')), 
                  'miktar': f"{md:.2f}", 
-                 'barkod': sk # Barkod olarak stok kodunu varsayıyoruz
+                 'barkod': sk 
              })
              print(f"   -> {i+1} işlendi: Stok={sk}, Miktar={md:.2f}")
 
