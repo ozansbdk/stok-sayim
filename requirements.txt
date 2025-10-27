@@ -21,7 +21,7 @@ pyzbar==0.1.9 # Barkod okuma için (varsa)
 # pytesseract==0.3.13 # Tesseract OCR kullanıyorsanız ekleyin, Gemini varken gereksiz olabilir
 
 # Google Gemini (OCR için)
-google-generativeai # Sadece bu gerekli!
+google-generativeai==0.7.2 # Sadece bu gerekli!
 google-api-core>=1.31.5 # Gemini'nin bağımlılığı, pip otomatik halleder ama eklemek iyi olabilir
 google-auth>=2.15.0 # Gemini'nin bağımlılığı
 googleapis-common-protos>=1.56.0 # Gemini'nin bağımlılığı
