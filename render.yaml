@@ -2,6 +2,7 @@ services:
   - type: web
     name: Stok-1
     env: python
+    pythonVersion: "3.12"
     buildCommand: 'pip install -r requirements.txt'
     
     # PreRunCommand: Tesseract ve statik dosyaları toplar.
