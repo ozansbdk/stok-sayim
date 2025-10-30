@@ -207,13 +207,94 @@ def yonetim_araclari(request):
 @require_POST
 def upload_and_reload_stok_data(request):
     """
-    Malzeme yükleme fonksiyonunun placeholder'ı. 
+    Excel/CSV dosyasından Malzeme listesini okur ve veritabanına yükler/günceller (UPSERT).
     """
-    # Basit bir POST işlemi yer tutucusunu koruyoruz (Hata vermez)
-    if 'excel_file' in request.FILES:
-        return JsonResponse({'success': True, 'message': '✅ Excel dosyası alındı. Veri yükleme mantığı views.py/upload_and_reload_stok_data fonksiyonuna eklenmelidir.'})
+    if 'excel_file' not in request.FILES: 
+        return JsonResponse({'success': False, 'message': 'Dosya bulunamadı.'}, status=400)
         
-    return JsonResponse({'success': False, 'message': 'Dosya bulunamadı.'}, status=400)
+    excel_file = request.FILES['excel_file']
+    
+    try:
+        excel_io = IO_Bytes(excel_file.read())
+        
+        # Dosya türüne göre okuma (CSV veya XLSX)
+        if excel_file.name.endswith('.csv'):
+             # UTF-8 ve diğer kodlamaları deneme (CSV'ler için gerekli)
+             try:
+                 df = pd.read_csv(excel_io, encoding='utf-8', sep=None, engine='python', dtype=str, keep_default_na=False)
+             except:
+                 excel_io.seek(0)
+                 df = pd.read_csv(excel_io, encoding='latin1', sep=None, engine='python', dtype=str, keep_default_na=False)
+        else: 
+             df = pd.read_excel(excel_io, dtype=str, keep_default_na=False)
+             
+        # Sütun başlıklarını temizleme
+        df.columns = df.columns.str.strip()
+        
+        # Gerekli minimum sütunlar (Sizin model alan adlarınıza göre ayarlandı)
+        required_cols = ["Stok Kodu", "Miktar", "Lokasyon Kodu"] 
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        
+        if missing_cols:
+             return JsonResponse({'success': False, 'message': f'Eksik sütunlar: {", ".join(missing_cols)}'}, status=400)
+
+        # Varsayılan değerler
+        defaults = {
+             "Parti": 'YOK', "Renk": 'YOK', "Stok Adı": '', "Birim": 'ADET', "Birim Fiyat": '0.0'
+        }
+        for col, dv in defaults.items():
+             if col not in df.columns: df[col] = dv
+             
+        created_count, updated_count, fail_count = 0, 0, 0
+        
+        with transaction.atomic():
+            for index, row in df.iterrows():
+                try:
+                    # Değerleri al ve standardize et
+                    stok_kod = row['Stok Kodu'].upper().strip()
+                    lokasyon_kodu = row['Lokasyon Kodu'].upper().strip() # <<< Düzeltildi
+                    parti_no = row['Parti'].upper().strip()
+                    renk = row['Renk'].upper().strip()
+                    
+                    if not stok_kod or not lokasyon_kodu: raise ValueError("Stok/Depo Kodu boş olamaz.")
+                    
+                    # Miktar ve Fiyatı Decimal'e çevir
+                    miktar_str = str(row['Miktar']).replace(',', '.').strip()
+                    fiyat_str = str(row['Birim Fiyat']).replace(',', '.').strip()
+                    
+                    stok_miktari = Decimal(miktar_str)
+                    birim_fiyati = Decimal(fiyat_str)
+                    
+                    bid = generate_unique_id(stok_kod, parti_no, lokasyon_kodu, renk)
+                    
+                    # Malzeme oluştur veya güncelle (UPSERT)
+                    _, created = Malzeme.objects.update_or_create(
+                        benzersiz_id=bid,
+                        defaults={
+                            'stok_kod': stok_kod,
+                            'malzeme_adi': row['Stok Adı'] or f"Stok {stok_kod}",
+                            'lokasyon_kodu': lokasyon_kodu,
+                            'parti_no': parti_no,
+                            'renk': renk,
+                            'olcu_birimi': row['Birim'],
+                            'sistem_stok': stok_miktari,
+                            'birim_fiyat': birim_fiyati
+                        }
+                    )
+                    
+                    if created: created_count += 1
+                    else: updated_count += 1
+
+                except Exception as e:
+                    print(f"Satır {index+2} yükleme hatası: {e}")
+                    fail_count += 1; continue
+            
+            # Başarılı dönüş
+            msg = f"✅ Bitti: {created_count} yeni, {updated_count} güncellenen. Hata/Atlanan: {fail_count}."
+            return JsonResponse({'success': True, 'message': msg})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Kritik Yükleme Hatası: {e}'}, status=500)
 
 
 # --- AJAX FONKSİYONLARI ---
@@ -237,11 +318,11 @@ def ajax_akilli_stok_ara(request):
 
     malzeme = None
     if seri_no != 'YOK':
-        malzeme = Malzeme.objects.filter(Q(stok_kod=seri_no) | Q(barkod=seri_no), lokasyon_kodu=depo_kod).first() # <<< Düzeltildi
+        malzeme = Malzeme.objects.filter(Q(stok_kod=seri_no) | Q(barkod=seri_no), lokasyon_kodu=depo_kod).first()
     
     if not malzeme and stok_kod_param != 'YOK':
         try:
-            malzeme = Malzeme.objects.get(stok_kod=stok_kod_param, parti_no=parti_no_param, renk=renk_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
+            malzeme = Malzeme.objects.get(stok_kod=stok_kod_param, parti_no=parti_no_param, renk=renk_param, lokasyon_kodu=depo_kod)
         except Malzeme.DoesNotExist:
              pass 
 
@@ -264,8 +345,7 @@ def ajax_akilli_stok_ara(request):
             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.lokasyon_kodu}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
-        # Varyant Arama Mantığı
-        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
+        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, lokasyon_kodu=depo_kod) 
         parti_varyantlar = set(v.parti_no for v in varyant_malzemeleri if v.parti_no != 'YOK')
         renk_varyantlar = set(v.renk for v in varyant_malzemeleri if v.renk != 'YOK')
         
@@ -395,7 +475,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
             
             rapor_data.append({
                 'Stok Kodu': malzeme.stok_kod, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, 
-                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, # <<< Düzeltildi
+                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, 
                 'Sistem Miktar': sistem_mik_dec, 'Sayım Miktar': sayilan_mik_dec, 'Miktar Fark': mik_fark_dec, 
                 'Birim Fiyat': birim_fiyat_dec, 'Sistem Tutar': sistem_tutar_dec, 'Tutar Fark': tutar_fark_dec, 
                 'Birim': malzeme.olcu_birimi
