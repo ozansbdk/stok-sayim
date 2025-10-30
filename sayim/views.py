@@ -706,6 +706,8 @@ def ajax_akilli_stok_ara(request):
     print(f"--- ARAMA BİTTİ (Başarısız) ---")
     return JsonResponse(response_data)
 
+# views.py içinde, ajax_sayim_kaydet fonksiyonunun yerine bu kodu kullanın.
+
 @csrf_exempt
 @transaction.atomic 
 def ajax_sayim_kaydet(request, sayim_emri_id):
@@ -718,6 +720,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 print(">> HATA: Benzersiz ID yok.")
                 return JsonResponse({'success': False, 'message': "HATA: Ürün ID eksik."}, status=400)
             
+            # --- Miktar Kontrolü ---
             try:
                 miktar_str = str(data.get('miktar', '0.0')).replace(',', '.').strip()
                 if not miktar_str: miktar_str = '0.0'
@@ -732,15 +735,42 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             pa = data.get('personel_adi', 'MISAFIR').strip().upper() or 'MISAFIR'
             lat, lon = str(data.get('lat', 'YOK')), str(data.get('lon', 'YOK'))
             
-            try: malzeme = get_object_or_404(Malzeme, benzersiz_id=bid) 
-            except Http404: 
-                print(f">> HATA: Malzeme ID({bid}) bulunamadı.")
-                return JsonResponse({'success': False, 'message': f"HATA: ID '{bid}' bulunamadı."}, status=404)
-            
+            # Sayım Emri kontrolü
             se = get_object_or_404(SayimEmri, pk=sayim_emri_id)
             if se.durum != 'Açık': 
                 print(f">> HATA: Sayım Emri ({sayim_emri_id}) kapalı.")
                 return JsonResponse({'success': False, 'message': 'Sayım kapalı.'}, status=403) 
+            
+            
+            # --- YENİ KISIM: Malzeme Varsa Getir, Yoksa Oluştur (UPSERT) ---
+            stok_kod = standardize_id_part(data.get('stok_kod', bid))
+            depo_kod = standardize_id_part(data.get('depo_kod', 'YOK'))
+            parti_no = standardize_id_part(data.get('parti_no', 'YOK'))
+            renk = standardize_id_part(data.get('renk', 'YOK'))
+            
+            malzeme_adi = data.get('malzeme_adi', f"Stok {stok_kod} (YENI)")
+            olcu_birimi = data.get('olcu_birimi', 'ADET')
+            
+            # Benzersiz ID ile kontrol et ve yoksa temel bilgileri kullanarak oluştur
+            malzeme, created = Malzeme.objects.update_or_create(
+                benzersiz_id=bid,
+                defaults={
+                    'malzeme_kodu': stok_kod,
+                    'lokasyon_kodu': depo_kod,
+                    'parti_no': parti_no,
+                    'renk': renk,
+                    'malzeme_adi': malzeme_adi,
+                    'olcu_birimi': olcu_birimi,
+                    'sistem_stogu': Decimal('0.0'), # Yeni stoklar için sistem stoku 0 olmalı
+                    'birim_fiyat': Decimal('0.0') # Varsayılan fiyat
+                }
+            )
+
+            if created:
+                 print(f">> BİLGİ: Yeni Malzeme ID({bid}) oluşturuldu (Stok Kodu: {stok_kod}).")
+            else:
+                 print(f">> BİLGİ: Mevcut Malzeme ID({bid}) bulundu.")
+            # --- YENİ KISIM SONU ---
             
             print(f">> Detay Oluşturuluyor: Miktar={m}, Personel={pa}...")
             
@@ -757,11 +787,9 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             return JsonResponse({'success': True, 'message': f"✅ {malzeme.malzeme_kodu} ({malzeme.parti_no}) {m:.2f} kayıt.", 'yeni_miktar': f"{ts:.2f}" })
         
         except SayimEmri.DoesNotExist: 
-            print(f">> HATA: Sayım Emri ID({sayim_emri_id}) yok.")
-            return JsonResponse({'success': False, 'message': "HATA: Sayım Emri yok."}, status=404)
+            # ... Sayım Emri Hatası ...
         except json.JSONDecodeError: 
-            print(f">> HATA: JSON Decode.")
-            return JsonResponse({'success': False, 'message': "HATA: Geçersiz JSON."}, status=400)
+            # ... JSON Hatası ...
         except Exception as e: 
             et = type(e).__name__; 
             print(f">> Kritik HATA ({et}): {e}")

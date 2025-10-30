@@ -215,8 +215,33 @@
             updateVariantInputs(data); // Dropdownları oluştur
         } else {
             urunBilgiAlani.className = 'status-missing';
-            kaydetBtn.disabled = true; // Bulunamadıysa kaydetme pasif
-            updateVariantInputs({ parti_no: partiNo || 'YOK', renk: renk || 'YOK' }); // Normal input göster
+            // Yeni stok girişi (yeni mantık): Stok Kodu varsa ve benzersiz ID'yi manuel oluşturabilirsek kaydetmeyi aktif et.
+            const stokKodManuel = document.getElementById('stok_kod_input')?.value.toUpperCase().trim();
+            if (stokKodManuel && stokKodManuel !== 'YOK') {
+                // Yeni stok için benzersiz ID'yi burada geçici olarak oluştur.
+                // Arka uç, bu ID ile yeni bir Malzeme oluşturacak.
+                const partiNoManuel = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
+                const renkManuel = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
+                
+                // Buradaki mantık, views.py'daki generate_unique_id fonksiyonunu taklit etmelidir.
+                // Biz burada sadece arama kriterlerini Benzersiz ID olarak kullanıp, arka uca bu bilgileri göndererek oluşturmasını isteyeceğiz.
+                
+                // Benzersiz ID oluşturma:
+                // Format: STOKKOD_PARTI_DEPO_RENK (bu sayede yeni bir stok yaratabiliriz)
+                currentBenzersizId = `${stokKodManuel}_${partiNoManuel}_${DEPO_KODU}_${renkManuel}`;
+                currentStokKod = stokKodManuel;
+                currentPartiNo = partiNoManuel;
+                currentRenk = renkManuel;
+
+                urunBilgi.innerText = `YENİ STOK OLUŞTURULACAK: ${currentBenzersizId}`;
+                urunBilgiAlani.className = 'status-found'; // Yeşil gibi görünmeli, çünkü kaydedilebilir
+                kaydetBtn.disabled = false; // KAYIT AKTİF
+                miktarInput.focus();
+                
+            } else {
+                 kaydetBtn.disabled = true; // Stok Kodu yoksa kaydetme pasif
+                 updateVariantInputs({ parti_no: data.parti_no || 'YOK', renk: data.renk || 'YOK' }); // Normal input göster
+            }
         }
     }
 
@@ -237,19 +262,21 @@
              ).join('');
              return `<select id="${id}">${optionsHTML}</select>`;
         };
-              
+                 
         // Parti No
+        const currentPartiValue = document.getElementById('parti_no_input')?.value || data.parti_no;
         if (data.parti_varyantlar && data.parti_varyantlar.length > 0) {
-            partiNoContainer.innerHTML = createSelect('parti_no_input', data.parti_varyantlar, data.parti_no);
+            partiNoContainer.innerHTML = createSelect('parti_no_input', data.parti_varyantlar, currentPartiValue);
         } else {
-            partiNoContainer.innerHTML = createInput('parti_no_input', 'Parti No (Opsiyonel)', data.parti_no);
+            partiNoContainer.innerHTML = createInput('parti_no_input', 'Parti No (Opsiyonel)', currentPartiValue);
         }
 
         // Renk/Varyant
+        const currentRenkValue = document.getElementById('renk_input')?.value || data.renk;
         if (data.renk_varyantlar && data.renk_varyantlar.length > 0) {
-            renkContainer.innerHTML = createSelect('renk_input', data.renk_varyantlar, data.renk);
+            renkContainer.innerHTML = createSelect('renk_input', data.renk_varyantlar, currentRenkValue);
         } else {
-            renkContainer.innerHTML = createInput('renk_input', 'Renk/Varyant (Opsiyonel)', data.renk);
+            renkContainer.innerHTML = createInput('renk_input', 'Renk/Varyant (Opsiyonel)', currentRenkValue);
         }
         
         // Dinamik olarak eklenen input/select için olay dinleyicilerini yeniden kur
@@ -261,6 +288,7 @@
     // **********************************************
     function akilliStokAra(seriNo = 'YOK', stokKod = 'YOK', partiNo = 'YOK', renk = 'YOK', depoKod = DEPO_KODU) {
         resetUIBeforeSearch(); // Arayüzü temizle
+        // Bu kısım arka uca arama isteği gönderir ve sonucu updateUIAfterSearch ile işler
 
         const params = new URLSearchParams({
             seri_no: seriNo,
@@ -292,9 +320,9 @@
                 console.error("Akıllı Arama Hatası:", error);
                 showMessage('kayit_mesaji', `Arama Hatası: ${error.message}`, 'error');
                  updateUIAfterSearch({ 
-                    found: false, urun_bilgi: `Arama Hatası: ${error.message}`,
-                    stok_kod: stokKod, parti_no: partiNo, renk: renk 
-                 });
+                     found: false, urun_bilgi: `Arama Hatası: ${error.message}`,
+                     stok_kod: stokKod, parti_no: partiNo, renk: renk 
+                    });
             });
     }
 
@@ -356,17 +384,17 @@
                          const renkEl = document.getElementById('renk_input');
                          if(renkEl) renkEl.value = item.renk !== 'YOK' ? item.renk : '';
 
-                        akilliStokAra(
-                            item.barkod !== 'YOK' ? item.barkod : 'YOK', 
-                            item.barkod === 'YOK' ? item.stok_kod : 'YOK', // Barkod yoksa stokla ara
-                            item.parti_no, 
-                            item.renk, 
-                            DEPO_KODU
-                        );
-                         Array.from(sonucTablosuBody.rows).forEach(r => r.style.backgroundColor = '');
-                         row.style.backgroundColor = '#e6f7ff';
-                    };
-                    row.insertCell().appendChild(islemBtn);
+                         akilliStokAra(
+                             item.barkod !== 'YOK' ? item.barkod : 'YOK', 
+                             item.barkod === 'YOK' ? item.stok_kod : 'YOK', // Barkod yoksa stokla ara
+                             item.parti_no, 
+                             item.renk, 
+                             DEPO_KODU
+                         );
+                          Array.from(sonucTablosuBody.rows).forEach(r => r.style.backgroundColor = '');
+                          row.style.backgroundColor = '#e6f7ff';
+                      };
+                      row.insertCell().appendChild(islemBtn);
                 });
                 topluSonucAlani.style.display = 'block';
 
@@ -417,9 +445,9 @@
 
 
     // **********************************************
-    // 5. SAYIM KAYDETME (AJAX POST)
+    // 5. SAYIM KAYDETME (AJAX POST) - YENİ STOK OLUŞTURMA İÇİN GEREKLİ ALANLAR EKLENDİ
     // **********************************************
-    async function kaydetSayim() { // async yapıldı
+    async function kaydetSayim() { 
         const miktarValue = miktarInput.value;
         
         if (!currentBenzersizId) { 
@@ -427,20 +455,24 @@
             return;
         }
 
-        // --- *** REVİZE 2: 'Decimal' JS'de yoktur, 'parseFloat' kullanıldı *** ---
+        // Arama inputlarından güncel (veya yeni girilen) değerleri al
+        const manuelStokKod = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
+        const manuelPartiNo = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
+        const manuelRenk = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
+        
+        // Stok Kodu (Benzersiz ID'yi ayrıştırmak için kullanılacak)
+        const finalStokKod = manuelStokKod !== 'YOK' ? manuelStokKod : currentStokKod; 
+        
         let miktarDecimal;
         try {
-             // miktarDecimal = Decimal(miktarValue.replace(',', '.')); // HATALI KOD
-             miktarDecimal = parseFloat(miktarValue.replace(',', '.')); // DOĞRU KOD
-             // if (miktarDecimal.isNaN() || miktarDecimal.lte(0)) { // HATALI KOD
-             if (isNaN(miktarDecimal) || miktarDecimal <= 0) { // DOĞRU KOD
+             miktarDecimal = parseFloat(miktarValue.replace(',', '.'));
+             if (isNaN(miktarDecimal) || miktarDecimal <= 0) {
                  throw new Error("Miktar sıfırdan büyük olmalıdır.");
              }
         } catch {
              showMessage('kayit_mesaji', 'Geçersiz miktar girdiniz. Lütfen sayısal bir değer girin (örn: 1.00).', 'error');
              return;
         }
-        // --- *** REVİZE 2 BİTTİ *** ---
 
         showMessage('kayit_mesaji', 'Konum bilgisi alınıyor...', 'info', 0); 
         kaydetBtn.disabled = true; 
@@ -449,12 +481,21 @@
         
         showMessage('kayit_mesaji', 'Kaydediliyor...', 'info', 0); 
 
+        // --- GEREKLİ YENİ ALANLAR EKLENİYOR ---
         const dataToSend = {
             benzersiz_id: currentBenzersizId, 
             miktar: miktarValue, 
             personel_adi: PERSONEL_ADI,
             lat: locationData.latitude,
-            lon: locationData.longitude
+            lon: locationData.longitude,
+            
+            // YENİ STOK OLUŞTURMAK İÇİN GEREKEN BİLGİLER
+            stok_kod: finalStokKod,              
+            depo_kod: DEPO_KODU,                 
+            parti_no: manuelPartiNo,             
+            renk: manuelRenk,                    
+            malzeme_adi: `Yeni Stok (${finalStokKod})`, 
+            olcu_birimi: 'ADET'                  
         };
 
         const url = `/ajax/sayim-kaydet/${SAYIM_EMRI_ID}`; 
@@ -526,18 +567,18 @@
         selectFileBtn.addEventListener('click', () => {
              imageInput.removeAttribute('capture'); 
              imageInput.click();
-         });
-         cameraBtn.addEventListener('click', () => {
+           });
+           cameraBtn.addEventListener('click', () => {
              imageInput.setAttribute('capture', 'environment'); 
              imageInput.click();
-         });
-         imageInput.addEventListener('change', function() {
+           });
+           imageInput.addEventListener('change', function() {
              if (this.files && this.files.length > 0) {
                  geminiOku(this.files[0]); 
              }
              this.value = null; 
              this.removeAttribute('capture'); 
-         });
+           });
     }
     
     // Manuel Arama Butonu İşleyicisi
@@ -584,9 +625,9 @@
         const partiNoVal = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
         const renkVal = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
 
-        if (sourceElementId === 'barkod_input') {
+        if (sourceElementId === 'barkod_input' && seriNoVal !== 'YOK') { // Sadece barkod girilmişse tam arama
             akilliStokAra(seriNoVal, 'YOK', 'YOK', 'YOK', DEPO_KODU);
-        } else {
+        } else if (stokKodVal !== 'YOK') { // Veya Stok kodu girilmişse detaylı arama
              akilliStokAra('YOK', stokKodVal, partiNoVal, renkVal, DEPO_KODU);
         }
     }
@@ -627,9 +668,7 @@
         setupEventListeners();
 
         // --- Sayfa Yüklendiğinde İlk Boş Aramayı Yap (isteğe bağlı) ---
-        // akilliStokAra('YOK', 'YOK', 'YOK', 'YOK', DEPO_KODU); 
-        // Veya barkod inputuna odaklan
-         barkodInput.focus();
+        barkodInput.focus();
     });
 </script>
 </body>
