@@ -154,16 +154,15 @@ def raporlama_onay(request, sayim_emri_id):
 
 # --- AUTH ve YÖNLENDİRME FONKSİYONLARI (Login Döngüsü Çözüldü) ---
 
-# Personel login fonksiyonu, login işlemi yaptığı için login_required OLMAMALIDIR.
-def personel_login(request, sayim_emri_id, depo_kodu): # <<< Parametreler eklendi
+# Bu view, settings.LOGIN_URL tarafından çağrılan, parametre almayan asıl login sayfasıdır.
+def personel_login(request): # <<< Parametresiz (urls.py'daki son düzeltmeye uyumlu)
     """Personel giriş ekranı (Fonksiyonel)."""
-    # Context'e parametreleri gönderiyoruz ki HTML hidden field'ları doldurabilsin.
+    # Bu view, Sayım Emri ve Depo ID'sini almadan giriş formunu gösterir.
+    # Varsayım: Bu sayfada kullanıcı Sayım Emri ID'si ve Depo Kodunu elle seçecek/girecektir.
     return render(request, 'sayim/personel_login.html', {
-        'sayim_emri_id': sayim_emri_id,
-        'depo_kodu': depo_kodu
+        # Eğer templates'de SayımEmri listesi gerekiyorsa, buraya eklenmeli.
     })
 
-# Bu view'lar basit yer tutucu olarak kaldı.
 def yeni_sayim_emri(request):
     """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
     return render(request, 'sayim/yeni_sayim_emri.html', {})
@@ -172,18 +171,18 @@ def depo_secim(request):
     """Depo Seçim Ekranı (Fonksiyonel yer tutucu)."""
     return render(request, 'sayim/depo_secim.html', {})
 
-# Bu view da login işlemi yaptığı için login_required OLMAMALIDIR.
 @require_POST
 def set_personel_session(request):
     """Personel oturumunu ayarlar ve sayım girişine yönlendirir."""
-    # POST verisinden sayim_emri_id ve depo_kodu'nu alıyoruz.
+    # POST verisinden Sayım Emri ID'si ve Depo Kodu'nu bekler.
     personel_adi = request.POST.get('personel_adi', 'MISAFIR').upper().strip()
     sayim_emri_id = request.POST.get('sayim_emri_id')
     depo_kodu = request.POST.get('depo_kodu')
     
-    # Giriş parametreleri boşsa tekrar login sayfasına yönlendir (HTML eksik olduğu için döngüye girmeyi engeller)
+    # Sayım Emri ID'si ve Depo Kodu boş gelirse hata (login ekranı bunları alamıyor olabilir)
     if not personel_adi or not sayim_emri_id or not depo_kodu:
-         return redirect('personel_login', sayim_emri_id='0', depo_kodu='YOK') # Hata ile geri yönlendir
+         # Giriş başarısızsa tekrar login'e yönlendir (veya bir hata mesajı göster)
+         return redirect('personel_login') 
 
     request.session['current_user'] = personel_adi
     

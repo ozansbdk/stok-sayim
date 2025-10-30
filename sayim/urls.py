@@ -18,8 +18,8 @@ from .views import (
     export_mutabakat_excel,
     set_personel_session, 
     
-    # 4. AUTH ve DİĞER FONKSİYONLAR
-    personel_login,  
+    # 4. AUTH ve DİĞER FONKSİYONLAR (Views.py'da tanımlı olanlar)
+    personel_login,  # <<< PARAMETRESİZ URL'e karşılık gelecek fonksiyon
     yeni_sayim_emri, 
     depo_secim,
 )
@@ -39,8 +39,8 @@ urlpatterns = [
     # ----------------------------------------
     # 2. AUTH VE YÖNLENDİRME (KRİTİK DÜZELTME)
     # ----------------------------------------
-    # LOGIN_URL'nin yönlendirdiği yer: Sayım Emri ID'si ve Depo Kodu almalıdır.
-    path('login/<uuid:sayim_emri_id>/<str:depo_kodu>/', personel_login, name='personel_login'), 
+    # settings.LOGIN_URL = '/login/' tanımıyla eşleşmeli. PARAMETRESİZ olmalı.
+    path('login/', personel_login, name='personel_login'), # <<< Düzeltilen Satır
     
     path('set-session/', set_personel_session, name='set_personel_session'),
     path('depo-secim/', depo_secim, name='depo_secim'),
