@@ -155,13 +155,21 @@ def raporlama_onay(request, sayim_emri_id):
 # --- AUTH ve YÖNLENDİRME FONKSİYONLARI (Login Döngüsü Çözüldü) ---
 
 # Bu view, settings.LOGIN_URL tarafından çağrılan, parametre almayan asıl login sayfasıdır.
-def personel_login(request): # <<< Parametresiz (urls.py'daki son düzeltmeye uyumlu)
-    """Personel giriş ekranı (Fonksiyonel)."""
-    # Bu view, Sayım Emri ve Depo ID'sini almadan giriş formunu gösterir.
-    # Varsayım: Bu sayfada kullanıcı Sayım Emri ID'si ve Depo Kodunu elle seçecek/girecektir.
-    return render(request, 'sayim/personel_login.html', {
-        # Eğer templates'de SayımEmri listesi gerekiyorsa, buraya eklenmeli.
-    })
+def personel_login(request): 
+    """
+    Personel giriş ekranı. Kullanıcının Sayım Emri ve Depo Kodu seçmesini sağlar.
+    (Login döngüsünü kırmak için parametresiz ve @login_required olmadan tanımlanmıştır)
+    """
+    # Tüm aktif Sayım Emirlerini ve Depo Kodlarını al
+    sayim_emirleri = SayimEmri.objects.filter(durum='BASLADI').order_by('-baslangic_tarihi')
+    depo_kodlari = Malzeme.objects.values_list('depo_kod', flat=True).distinct().order_by('depo_kod')
+    
+    context = {
+        'sayim_emirleri': sayim_emirleri,
+        'depo_kodlari': [d for d in depo_kodlari if d and d != 'YOK'],
+    }
+    
+    return render(request, 'sayim/personel_login.html', context)
 
 def yeni_sayim_emri(request):
     """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
@@ -179,9 +187,9 @@ def set_personel_session(request):
     sayim_emri_id = request.POST.get('sayim_emri_id')
     depo_kodu = request.POST.get('depo_kodu')
     
-    # Sayım Emri ID'si ve Depo Kodu boş gelirse hata (login ekranı bunları alamıyor olabilir)
+    # Sayım Emri ID'si ve Depo Kodu boş gelirse login sayfasına geri yönlendir (Döngüyü kırar)
     if not personel_adi or not sayim_emri_id or not depo_kodu:
-         # Giriş başarısızsa tekrar login'e yönlendir (veya bir hata mesajı göster)
+         # Hata durumunda tekrar login sayfasına yönlendir (parametre göndermeye gerek yok)
          return redirect('personel_login') 
 
     request.session['current_user'] = personel_adi

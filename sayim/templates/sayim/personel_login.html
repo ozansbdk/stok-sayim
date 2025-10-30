@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -5,24 +6,38 @@
     <title>Personel Girişi</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* SADECE TEMEL OKUNABİLİRLİK İÇİN STİL */
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        input[type="text"], button { padding: 10px; margin: 5px 0; display: block; width: 100%; box-sizing: border-box; }
-        h1 { margin-bottom: 10px; }
+        /* TEMEL STİLLER */
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: auto; background-color: #f4f7f6; }
+        input[type="text"], button, select { padding: 10px; margin: 10px 0; display: block; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { cursor: pointer; background-color: #007bff; color: white; border: none; font-weight: bold; }
+        h1 { margin-bottom: 20px; text-align: center; }
+        label { display: block; font-size: 0.9em; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
     <h1>Personel Girişi</h1>
     
-    <p>Emir: {{ sayim_emri_id }} | Depo: {{ depo_kodu }}</p>
-    
     <form method="POST" action="{% url 'set_personel_session' %}">
         {% csrf_token %} 
         
-        <input type="text" name="personel_adi" placeholder="Personel Adınız" required>
+        <label for="personel_adi_input">Personel Adınız:</label>
+        <input type="text" id="personel_adi_input" name="personel_adi" placeholder="Adınızı girin" required>
         
-        <input type="hidden" name="sayim_emri_id" value="{{ sayim_emri_id }}">
-        <input type="hidden" name="depo_kodu" value="{{ depo_kodu }}">
+        <label for="sayim_emri_select">Aktif Sayım Emri:</label>
+        <select id="sayim_emri_select" name="sayim_emri_id" required>
+            <option value="">-- Seçiniz --</option>
+            {% for emir in sayim_emirleri %}
+                <option value="{{ emir.id }}">{{ emir.ad }} ({{ emir.id }})</option>
+            {% endfor %}
+        </select>
+
+        <label for="depo_kodu_select">Depo Kodu Seçimi:</label>
+        <select id="depo_kodu_select" name="depo_kodu" required>
+            <option value="">-- Seçiniz --</option>
+            {% for kod in depo_kodlari %}
+                <option value="{{ kod }}">{{ kod }}</option>
+            {% endfor %}
+        </select>
         
         <button type="submit">Oturumu Başlat</button>
     </form>
