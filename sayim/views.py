@@ -13,7 +13,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
-from django.conf import settings # settings.GEMINI_API_KEY için
+from django.conf import settings 
 from django.utils import timezone
 from django.utils.text import slugify
 from django.db import transaction
@@ -45,7 +45,6 @@ def get_malzeme_from_unique_id(unique_id):
     try:
         return Malzeme.objects.get(benzersiz_id=unique_id)
     except Malzeme.DoesNotExist:
-        # ID'yi parçalayarak bulmayı dene (daha esnek arama)
         parts = unique_id.split('_')
         if len(parts) == 4:
             stok_kod, parti_no, depo_kod, renk = parts
@@ -155,34 +154,40 @@ def raporlama_onay(request, sayim_emri_id):
 
 # --- AUTH ve YÖNLENDİRME FONKSİYONLARI (Login Döngüsü Çözüldü) ---
 
-# Bu view'lar, login işlemini gerçekleştirdiği için login_required OLMAMALIDIR.
-def personel_login(request):
+# Personel login fonksiyonu, login işlemi yaptığı için login_required OLMAMALIDIR.
+def personel_login(request, sayim_emri_id, depo_kodu): # <<< Parametreler eklendi
     """Personel giriş ekranı (Fonksiyonel)."""
-    return render(request, 'sayim/personel_login.html', {})
+    # Context'e parametreleri gönderiyoruz ki HTML hidden field'ları doldurabilsin.
+    return render(request, 'sayim/personel_login.html', {
+        'sayim_emri_id': sayim_emri_id,
+        'depo_kodu': depo_kodu
+    })
 
-# Bu view'a erişim genellikle login sonrası olmalıdır, ancak urls.py'da sorun yaratmamak için dekoratörsüz bıraktık.
+# Bu view'lar basit yer tutucu olarak kaldı.
 def yeni_sayim_emri(request):
     """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
     return render(request, 'sayim/yeni_sayim_emri.html', {})
 
-# Bu view'a erişim genellikle login sonrası olmalıdır, ancak urls.py'da sorun yaratmamak için dekoratörsüz bıraktık.
 def depo_secim(request):
     """Depo Seçim Ekranı (Fonksiyonel yer tutucu)."""
     return render(request, 'sayim/depo_secim.html', {})
 
+# Bu view da login işlemi yaptığı için login_required OLMAMALIDIR.
 @require_POST
 def set_personel_session(request):
     """Personel oturumunu ayarlar ve sayım girişine yönlendirir."""
-    # Bu view, form POST işlemi yaptığı için @login_required OLMAMALIDIR.
+    # POST verisinden sayim_emri_id ve depo_kodu'nu alıyoruz.
     personel_adi = request.POST.get('personel_adi', 'MISAFIR').upper().strip()
     sayim_emri_id = request.POST.get('sayim_emri_id')
     depo_kodu = request.POST.get('depo_kodu')
     
+    # Giriş parametreleri boşsa tekrar login sayfasına yönlendir (HTML eksik olduğu için döngüye girmeyi engeller)
     if not personel_adi or not sayim_emri_id or not depo_kodu:
-         return redirect('personel_login') 
+         return redirect('personel_login', sayim_emri_id='0', depo_kodu='YOK') # Hata ile geri yönlendir
 
     request.session['current_user'] = personel_adi
     
+    # Başarılı girişten sonra sayım girişine yönlendir
     return redirect('sayim_giris', sayim_emri_id=sayim_emri_id)
 
 
@@ -234,7 +239,6 @@ def ajax_akilli_stok_ara(request):
             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.depo_kod}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
-        # Varyant Arama Mantığı
         varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, depo_kod=depo_kod)
         parti_varyantlar = set(v.parti_no for v in varyant_malzemeleri if v.parti_no != 'YOK')
         renk_varyantlar = set(v.renk for v in varyant_malzemeleri if v.renk != 'YOK')
@@ -355,8 +359,8 @@ def export_mutabakat_excel(request, sayim_emri_id):
         rapor_data = []
         for malzeme in tum_malzemeler:
             malzeme_id = malzeme.benzersiz_id
-            sayilan_mik_dec = malzeme.sistem_stok or Decimal('0.0')
-            sistem_mik_dec = malzeme.sistem_stok or Decimal('0.0') # Bu satir mantiksal hata iceriyor olabilir
+            sayilan_mik_dec = sayilan_miktarlar.get(malzeme_id, Decimal('0.0'))
+            sistem_mik_dec = malzeme.sistem_stok or Decimal('0.0')
             birim_fiyat_dec = malzeme.birim_fiyat or Decimal('0.0')
             
             mik_fark_dec = sayilan_mik_dec - sistem_mik_dec
