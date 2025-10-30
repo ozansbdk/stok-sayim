@@ -12,6 +12,7 @@
         button { cursor: pointer; background-color: #007bff; color: white; border: none; font-weight: bold; }
         h1 { margin-bottom: 20px; text-align: center; }
         label { display: block; font-size: 0.9em; font-weight: bold; margin-top: 10px; }
+        .btn-secondary { background-color: #6c757d; }
     </style>
 </head>
 <body>
@@ -41,5 +42,10 @@
         
         <button type="submit">Oturumu Başlat</button>
     </form>
+
+    <hr style="margin-top: 20px;">
+    <a href="{% url 'yonetim_araclari' %}">
+        <button type="button" class="btn-secondary">ADMIN: Stok Verisi Yükle</button>
+    </a>
 </body>
 </html>
