@@ -95,7 +95,7 @@ def create_or_update_malzeme(data):
 @login_required
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
-    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-baslangic_tarihi')
+    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
     return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
 @login_required
@@ -161,7 +161,7 @@ def personel_login(request):
     (Login döngüsünü kırmak için parametresiz ve @login_required olmadan tanımlanmıştır)
     """
     # Tüm aktif Sayım Emirlerini ve Depo Kodlarını al
-    sayim_emirleri = SayimEmri.objects.filter(durum='BASLADI').order_by('-baslangic_tarihi')
+    sayim_emirleri = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
     depo_kodlari = Malzeme.objects.values_list('depo_kod', flat=True).distinct().order_by('depo_kod')
     
     context = {
