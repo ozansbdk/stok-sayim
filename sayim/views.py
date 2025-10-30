@@ -96,7 +96,7 @@ def create_or_update_malzeme(data):
 @login_required
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
-    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
+    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih') # Düzeltildi: -tarih
     return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
 @login_required
@@ -201,13 +201,13 @@ def set_personel_session(request):
 # GEÇİCİ ÇÖZÜM: Login kilitlenmesini kırmak için @login_required kaldırıldı.
 def yonetim_araclari(request): 
     """Yönetim araçları ana sayfası (Veri yüklemek için geçici olarak korumasız)."""
-    return render(request, 'sayim/yonetim_araclari.html', {}) # <<< views.py'da yonetim_araclari.html'e karşılık geldiği varsayılıyor
+    # TEMPLATE ADI DÜZELTİLDİ: yonetim.html
+    return render(request, 'sayim/yonetim.html', {}) 
 
 @require_POST
 def upload_and_reload_stok_data(request):
     """
     Malzeme yükleme fonksiyonunun placeholder'ı. 
-    Not: Bu fonksiyonun üzerinde de @login_required OLMAMALIDIR (kilitlenme çözümü için).
     """
     # Basit bir POST işlemi yer tutucusunu koruyoruz (Hata vermez)
     if 'excel_file' in request.FILES:
@@ -237,11 +237,11 @@ def ajax_akilli_stok_ara(request):
 
     malzeme = None
     if seri_no != 'YOK':
-        malzeme = Malzeme.objects.filter(Q(stok_kod=seri_no) | Q(barkod=seri_no), lokasyon_kodu=depo_kod).first()
+        malzeme = Malzeme.objects.filter(Q(stok_kod=seri_no) | Q(barkod=seri_no), lokasyon_kodu=depo_kod).first() # <<< Düzeltildi
     
     if not malzeme and stok_kod_param != 'YOK':
         try:
-            malzeme = Malzeme.objects.get(stok_kod=stok_kod_param, parti_no=parti_no_param, renk=renk_param, lokasyon_kodu=depo_kod)
+            malzeme = Malzeme.objects.get(stok_kod=stok_kod_param, parti_no=parti_no_param, renk=renk_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
         except Malzeme.DoesNotExist:
              pass 
 
@@ -264,7 +264,8 @@ def ajax_akilli_stok_ara(request):
             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.lokasyon_kodu}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
-        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, lokasyon_kodu=depo_kod) 
+        # Varyant Arama Mantığı
+        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
         parti_varyantlar = set(v.parti_no for v in varyant_malzemeleri if v.parti_no != 'YOK')
         renk_varyantlar = set(v.renk for v in varyant_malzemeleri if v.renk != 'YOK')
         
@@ -394,7 +395,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
             
             rapor_data.append({
                 'Stok Kodu': malzeme.stok_kod, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, 
-                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, 
+                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, # <<< Düzeltildi
                 'Sistem Miktar': sistem_mik_dec, 'Sayım Miktar': sayilan_mik_dec, 'Miktar Fark': mik_fark_dec, 
                 'Birim Fiyat': birim_fiyat_dec, 'Sistem Tutar': sistem_tutar_dec, 'Tutar Fark': tutar_fark_dec, 
                 'Birim': malzeme.olcu_birimi
