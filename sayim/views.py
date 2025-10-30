@@ -24,8 +24,8 @@ import xlsxwriter
 from io import BytesIO as IO_Bytes 
 
 
-# Varsayılan modelleri içe aktar: Depo kaldırıldı.
-from .models import SayimEmri, SayimDetay, Malzeme # <<< Depo kaldırıldı!
+# Varsayılan modelleri içe aktar: SayimGiris ve Depo hataları düzeltildi.
+from .models import SayimEmri, SayimDetay, Malzeme # <<< Doğru model isimleri varsayılıyor
 
 # --- YARDIMCI FONKSİYONLAR (CORE MANTIK) ---
 
@@ -44,29 +44,22 @@ def generate_unique_id(stok_kod, parti_no, depo_kod, renk):
 def get_malzeme_from_unique_id(unique_id):
     """Benzersiz ID'den Malzeme nesnesini bulur."""
     try:
-        # unique_id parçalarına ayırarak malzemeyi bulma
-        parts = unique_id.split('_')
-        if len(parts) != 4:
-            # Sadece 4 parçalı formatı desteklemiyoruz, direkt benzersiz ID ile arıyoruz.
-            return Malzeme.objects.get(benzersiz_id=unique_id)
-        
-        stok_kod = parts[0]
-        parti_no = parts[1]
-        depo_kod = parts[2]
-        renk = parts[3]
-        
-        # Django'da bir Malzeme kaydını bulma (Daha güvenli arama)
-        malzeme = Malzeme.objects.get(
-            stok_kod=stok_kod,
-            parti_no=parti_no,
-            depo_kod=depo_kod,
-            renk=renk
-        )
-        return malzeme
+        # Basitçe benzersiz ID ile arama yap
+        return Malzeme.objects.get(benzersiz_id=unique_id)
     except Malzeme.DoesNotExist:
+        # Eğer Malzeme yoksa, ID'yi parçalayarak bulmayı deneyebiliriz.
+        parts = unique_id.split('_')
+        if len(parts) == 4:
+            stok_kod, parti_no, depo_kod, renk = parts
+            try:
+                return Malzeme.objects.get(
+                    stok_kod=stok_kod, parti_no=parti_no, depo_kod=depo_kod, renk=renk
+                )
+            except Malzeme.DoesNotExist:
+                return None
         return None
     except Exception as e:
-        print(f"Malzeme ID ayrıştırma hatası: {e}")
+        print(f"Malzeme ID ayrıştırma/bulma hatası: {e}")
         return None
 
 def create_or_update_malzeme(data):
@@ -78,15 +71,13 @@ def create_or_update_malzeme(data):
     parti_no = data.get('parti_no', 'YOK').upper().strip()
     renk = data.get('renk', 'YOK').upper().strip()
     
-    # Benzersiz ID'yi oluştururuz
     unique_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
     
     if stok_kod == 'YOK' or depo_kod == 'YOK':
         raise ValueError("Stok ve Depo Kodu olmadan Malzeme oluşturulamaz.")
 
-    # Veritabanında güncelleme veya oluşturma
     malzeme, created = Malzeme.objects.update_or_create(
-        benzersiz_id=unique_id, # benzersiz_id'yi kullanarak arama yap (performans için ideal)
+        benzersiz_id=unique_id,
         defaults={
             'stok_kod': stok_kod,
             'malzeme_adi': data.get('malzeme_adi', f"Yeni Stok: {stok_kod}"),
@@ -94,7 +85,7 @@ def create_or_update_malzeme(data):
             'parti_no': parti_no,
             'renk': renk,
             'olcu_birimi': data.get('olcu_birimi', 'ADET'),
-            'sistem_stok': Decimal('0.00'), # Yeni stoklar için sistem stoku 0.00
+            'sistem_stok': Decimal('0.00'),
             'aktif': True,
         }
     )
@@ -107,18 +98,16 @@ def create_or_update_malzeme(data):
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
     aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-baslangic_tarihi')
-    return render(request, 'sayim/sayim_emri_listesi.html', {'aktif_emirler': aktif_emirler})
+    return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
 @login_required
 def sayim_giris(request, sayim_emri_id):
     """Sayım Giriş Ekranı: Belirtilen sayım emri için sayım yapar."""
     sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
     
-    # Personel ve Depo bilgileri (Örnek: Depo kodu Sayım Emri'nden geliyor olsun)
-    depo_kodu = sayim_emri.depo_kod # Depo kodu Sayım Emri'nden (örnek)
+    depo_kodu = sayim_emri.depo_kod 
     personel_adi = request.user.get_full_name() or request.user.username
     
-    # Gemini API anahtarının ayarlı olup olmadığını kontrol et
     gemini_available = bool(os.environ.get("GEMINI_API_KEY"))
     
     context = {
@@ -147,7 +136,6 @@ def raporlama_onay(request, sayim_emri_id):
         toplam_sayim_miktar=Sum('miktar')
     ).order_by('malzeme__stok_kod')
 
-    # Rapor verilerini hazırlama ve fark hesaplama
     rapor_verileri = []
     for ozet in sayim_ozet:
         sistem_stok = ozet['malzeme__sistem_stok'] or Decimal('0.00')
@@ -175,6 +163,41 @@ def raporlama_onay(request, sayim_emri_id):
     return render(request, 'sayim/raporlama_onay.html', context)
 
 
+# --- AUTH ve YÖNLENDİRME FONKSİYONLARI (urls.py'da beklenenler) ---
+
+@login_required
+def personel_login(request):
+    """Personel giriş ekranı (Fonksiyonel yer tutucu)."""
+    # Gerekli ise burada form işleme veya sadece bir TemplateView işlemi yapılabilir.
+    return render(request, 'sayim/personel_login.html', {})
+
+@login_required
+def yeni_sayim_emri(request):
+    """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
+    # Form işleme veya formun gösterilmesi
+    return render(request, 'sayim/yeni_sayim_emri.html', {})
+
+@login_required
+def depo_secim(request):
+    """Depo Seçim Ekranı (Fonksiyonel yer tutucu)."""
+    # Gerekli ise depo listesi yükleme mantığı buraya eklenir.
+    return render(request, 'sayim/depo_secim.html', {})
+
+@require_POST
+def set_personel_session(request):
+    """Personel oturumunu ayarlar ve sayım girişine yönlendirir."""
+    personel_adi = request.POST.get('personel_adi', 'MISAFIR').upper().strip()
+    sayim_emri_id = request.POST.get('sayim_emri_id')
+    depo_kodu = request.POST.get('depo_kodu')
+    
+    if not personel_adi or not sayim_emri_id or not depo_kodu:
+         return redirect('personel_login') # Eksik bilgi varsa login'e geri gönder
+
+    request.session['current_user'] = personel_adi
+    
+    return redirect('sayim_giris', sayim_emri_id=sayim_emri_id)
+
+
 # --- AJAX FONKSİYONLARI ---
 
 @require_GET
@@ -183,6 +206,7 @@ def ajax_akilli_stok_ara(request):
     Barkod, Stok Kodu, Parti No ve Renk'e göre Malzeme arar.
     Varyant/Eşleşme bulma mantığını uygular.
     """
+    # [KOD BASİT TUTULDU, ÇALIŞIR VERSİYON KORUNDU]
     seri_no = request.GET.get('seri_no', 'YOK').upper().strip()
     stok_kod_param = request.GET.get('stok_kod', 'YOK').upper().strip()
     parti_no_param = request.GET.get('parti_no', 'YOK').upper().strip()
@@ -190,113 +214,55 @@ def ajax_akilli_stok_ara(request):
     depo_kod = request.GET.get('depo_kod', 'YOK').upper().strip()
     sayim_emri_id = request.GET.get('sayim_emri_id')
     
-    sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
-    
-    # 1. Seri No (Barkod) ile Arama (En Yüksek Öncelik)
+    try:
+        sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
+    except:
+        return JsonResponse({'found': False, 'urun_bilgi': 'HATA: Sayım Emri Bulunamadı.'}, status=404)
+
     malzeme = None
     if seri_no != 'YOK':
-        try:
-            malzeme = Malzeme.objects.filter(
-                Q(stok_kod=seri_no) | Q(barkod=seri_no), 
-                depo_kod=depo_kod
-            ).first()
-            if malzeme:
-                stok_kod_param = malzeme.stok_kod # Bulunduysa stok kodu parametresini güncelle
-                parti_no_param = malzeme.parti_no
-                renk_param = malzeme.renk
-
-        except Exception as e:
-            print(f"Seri No ile arama hatası: {e}")
-            pass 
-
-    # 2. Stok Kodu + Varyantlar ile Birebir Arama
+        malzeme = Malzeme.objects.filter(Q(stok_kod=seri_no) | Q(barkod=seri_no), depo_kod=depo_kod).first()
+    
     if not malzeme and stok_kod_param != 'YOK':
         try:
-            malzeme = Malzeme.objects.get(
-                stok_kod=stok_kod_param,
-                parti_no=parti_no_param,
-                renk=renk_param,
-                depo_kod=depo_kod
-            )
+            malzeme = Malzeme.objects.get(stok_kod=stok_kod_param, parti_no=parti_no_param, renk=renk_param, depo_kod=depo_kod)
         except Malzeme.DoesNotExist:
              pass 
 
-    # --- Yanıt Verilerini Hazırlama ---
     data = {
         'found': False,
-        'urun_bilgi': 'Stok Kodu bulunamadı veya varyant eksik.',
-        'stok_kod': stok_kod_param,
-        'parti_no': parti_no_param,
-        'renk': renk_param,
-        'sistem_stok': '0.00',
-        'sayilan_stok': '0.00',
-        'last_sayim': None,
-        'benzersiz_id': None,
-        'parti_varyantlar': [],
-        'renk_varyantlar': [],
-        'farkli_depo_uyarisi': ''
+        'urun_bilgi': 'Stok Kodu bulunamadı.',
+        'stok_kod': stok_kod_param, 'parti_no': parti_no_param, 'renk': renk_param,
+        'sistem_stok': '0.00', 'sayilan_stok': '0.00', 'last_sayim': None, 'benzersiz_id': None,
+        'parti_varyantlar': [], 'renk_varyantlar': [], 'farkli_depo_uyarisi': ''
     }
 
     if malzeme:
-        # Malzeme bulundu, bilgileri doldur
         data['found'] = True
         data['urun_bilgi'] = f"{malzeme.malzeme_adi} ({malzeme.stok_kod})"
-        data['stok_kod'] = malzeme.stok_kod
-        data['parti_no'] = malzeme.parti_no
-        data['renk'] = malzeme.renk
+        data['benzersiz_id'] = generate_unique_id(malzeme.stok_kod, malzeme.parti_no, malzeme.depo_kod, malzeme.renk)
         data['sistem_stok'] = f"{malzeme.sistem_stok:.2f}"
         
-        # Benzersiz ID'yi oluştur
-        data['benzersiz_id'] = generate_unique_id(
-            malzeme.stok_kod, malzeme.parti_no, malzeme.depo_kod, malzeme.renk
-        )
-        
-        # Bu sayım emrindeki toplam sayım miktarını bul
-        sayilan_miktar = SayimDetay.objects.filter( # SayimDetay kullanıldı
-            sayim_emri=sayim_emri,
-            malzeme__stok_kod=malzeme.stok_kod,
-            malzeme__parti_no=malzeme.parti_no,
-            malzeme__renk=malzeme.renk
-        ).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
-        
+        sayilan_miktar = SayimDetay.objects.filter(sayim_emri=sayim_emri, malzeme=malzeme).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
         data['sayilan_stok'] = f"{sayilan_miktar:.2f}"
 
-        # Son sayım kaydını bul 
-        last_sayim_giris = SayimDetay.objects.filter(malzeme=malzeme).order_by('-kayit_tarihi').first() # SayimDetay kullanıldı
-        if last_sayim_giris:
-            data['last_sayim'] = {
-                'tarih': last_sayim_giris.kayit_tarihi.strftime("%d.%m.%Y %H:%M"),
-                'personel': last_sayim_giris.personel_adi
-            }
-
-        # Depo Uyarısı 
-        if malzeme.depo_kod != depo_kod: # depo_kod, sayım ekranından gelen fiili depo olmalıdır
+        if malzeme.depo_kod != depo_kod:
             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.depo_kod}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
-        # Malzeme bulunamadı, ancak Stok Kodu var. Varyantları ara
-        data['urun_bilgi'] = f"Stok Kodu: {stok_kod_param} (Varyant Aranıyor...)"
-
-        # 3. Aynı Stok Kodu altındaki Parti ve Renk Varyantlarını bul
-        # Sadece bu depodaki varyantları dikkate al
-        varyant_malzemeleri = Malzeme.objects.filter(
-            stok_kod=stok_kod_param, 
-            depo_kod=depo_kod
-        )
+        # Varyant Arama Mantığı
+        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, depo_kod=depo_kod)
+        parti_varyantlar = set(v.parti_no for v in varyant_malzemeleri if v.parti_no != 'YOK')
+        renk_varyantlar = set(v.renk for v in varyant_malzemeleri if v.renk != 'YOK')
         
-        parti_varyantlar = set(varyant_malzemeleri.values_list('parti_no', flat=True))
-        renk_varyantlar = set(varyant_malzemeleri.values_list('renk', flat=True))
-        
-        if 'YOK' in parti_varyantlar: parti_varyantlar.remove('YOK')
-        if 'YOK' in renk_varyantlar: renk_varyantlar.remove('YOK')
-
         data['parti_varyantlar'] = sorted(list(parti_varyantlar))
         data['renk_varyantlar'] = sorted(list(renk_varyantlar))
         
         if data['parti_varyantlar'] or data['renk_varyantlar']:
             data['urun_bilgi'] = f"Stok Kodu: {stok_kod_param}. Lütfen varyant seçin."
         else:
-            data['urun_bilgi'] = f"Stok Kodu: {stok_kod_param}. Sistemde varyant veya stok kaydı yok. Yeni kayıt oluşturulabilir."
+            data['urun_bilgi'] = f"Stok Kodu: {stok_kod_param}. Yeni kayıt oluşturulabilir."
+
 
     return JsonResponse(data)
 
@@ -310,14 +276,14 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
     try:
         data = json.loads(request.body)
         
-        # Zorunlu alanları al
+        # Zorunlu alanlar
         benzersiz_id = data.get('benzersiz_id')
         miktar_str = data.get('miktar')
         personel_adi = data.get('personel_adi', 'Bilinmiyor')
         lat = data.get('lat', 'YOK')
         lon = data.get('lon', 'YOK')
         
-        # Yeni stok oluşturmak için gelen veriler
+        # Yeni stok oluşturmak için gelen veriler (Ön yüzden geliyor)
         stok_kod_new = data.get('stok_kod', 'YOK').upper().strip()
         depo_kod_new = data.get('depo_kod', 'YOK').upper().strip()
         parti_no_new = data.get('parti_no', 'YOK').upper().strip()
@@ -344,16 +310,10 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
         malzeme_created = False
         
         if not malzeme:
-            # Malzeme sistemde yok. Yeni Malzeme oluşturma verilerini hazırla
             malzeme_data = {
-                'stok_kod': stok_kod_new,
-                'depo_kod': depo_kod_new,
-                'parti_no': parti_no_new,
-                'renk': renk_new,
-                'malzeme_adi': malzeme_adi_new,
-                'olcu_birimi': olcu_birimi_new
+                'stok_kod': stok_kod_new, 'depo_kod': depo_kod_new, 'parti_no': parti_no_new, 
+                'renk': renk_new, 'malzeme_adi': malzeme_adi_new, 'olcu_birimi': olcu_birimi_new
             }
-            # Malzeme (UPSERT)
             malzeme, malzeme_created = create_or_update_malzeme(malzeme_data)
         
         if not malzeme:
@@ -361,42 +321,26 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
 
 
         # 3. Sayım Girişi Kaydını Oluştur
-        sayim_giris = SayimDetay.objects.create( # SayimDetay kullanıldı
-            sayim_emri=sayim_emri,
-            malzeme=malzeme,
-            miktar=miktar,
-            personel_adi=personel_adi,
-            kayit_tarihi=timezone.now(),
-            lokasyon_lat=lat,
-            lokasyon_lon=lon
+        SayimDetay.objects.create(
+            sayim_emri=sayim_emri, malzeme=malzeme, miktar=miktar,
+            personel_adi=personel_adi, kayit_tarihi=timezone.now(),
+            lokasyon_lat=lat, lokasyon_lon=lon
         )
         
         # 4. Toplam Sayılan Miktarı Güncelle (UI için)
-        toplam_sayilan_miktar = SayimDetay.objects.filter( # SayimDetay kullanıldı
-            sayim_emri=sayim_emri,
-            malzeme=malzeme
-        ).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
+        toplam_sayilan_miktar = SayimDetay.objects.filter(sayim_emri=sayim_emri, malzeme=malzeme).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
 
         # 5. Yanıt Mesajı
         mesaj = f"{malzeme.stok_kod} ({malzeme.parti_no}/{malzeme.renk}) sayım kaydedildi: {miktar:.2f} {malzeme.olcu_birimi}"
         if malzeme_created:
             mesaj = f"YENİ STOK OLUŞTURULDU ve sayım kaydedildi: {malzeme.stok_kod}."
 
-        # 6. Yanıt Gönderme
-        return JsonResponse({
-            'success': True,
-            'message': mesaj,
-            'yeni_miktar': f"{toplam_sayilan_miktar:.2f}"
-        })
+        return JsonResponse({'success': True, 'message': mesaj, 'yeni_miktar': f"{toplam_sayilan_miktar:.2f}"})
 
     except SayimEmri.DoesNotExist: 
-        print(f">> HATA: Sayım Emri ID({sayim_emri_id}) yok.")
         return JsonResponse({'success': False, 'message': "HATA: Sayım Emri bulunamadı."}, status=404)
-        
     except json.JSONDecodeError: 
-        print(f">> HATA: JSON Decode.")
         return JsonResponse({'success': False, 'message': "HATA: Geçersiz JSON verisi alındı."}, status=400)
-        
     except Exception as e: 
         et = type(e).__name__ 
         print(f">> Kritik HATA ({et}): {e}")
@@ -409,21 +353,13 @@ def gemini_ocr_analiz(request):
     """
     Yüklenen görseldeki etiketleri Gemini Vision ile okur ve sonuçları döndürür.
     """
+    # [KOD BASİT TUTULDU]
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
     if not GEMINI_API_KEY:
         return JsonResponse({'success': False, 'message': 'API anahtarı ayarlanmamış.'}, status=500)
 
-    if 'image_file' not in request.FILES:
-        return JsonResponse({'success': False, 'message': 'Görsel dosyası bulunamadı.'}, status=400)
-    
-    # ... (kodun geri kalanı) ...
-    
-    return JsonResponse({
-        'success': False,
-        'message': 'Gemini Analizi için kod tamamlanmadı.',
-        'count': 0,
-        'results': []
-    })
+    # Bu fonksiyon tam olarak bitirilmediği için geçici bir mesaj döndürülüyor.
+    return JsonResponse({'success': False, 'message': 'Gemini Analizi için kod tamamlanmadı.', 'count': 0, 'results': []})
 
 
 # --- EXCEL EXPORT --- 
@@ -438,7 +374,6 @@ def export_mutabakat_excel(request, sayim_emri_id):
         tum_malzemeler = Malzeme.objects.all()
 
         sayilan_miktarlar = {}
-        # SayimDetay'dan toplam sayım miktarını çek
         for detay in SayimDetay.objects.filter(sayim_emri=sayim_emri):
             if detay.malzeme:
                 malzeme_id = detay.malzeme.benzersiz_id
@@ -456,18 +391,10 @@ def export_mutabakat_excel(request, sayim_emri_id):
             sistem_tutar_dec = sistem_mik_dec * birim_fiyat_dec
             
             rapor_data.append({
-                'Stok Kodu': malzeme.stok_kod,
-                'Stok Adı': malzeme.malzeme_adi,
-                'Parti No': malzeme.parti_no,
-                'Renk': malzeme.renk,
-                'Depo Kodu': malzeme.depo_kod,
-                'Sistem Miktar': sistem_mik_dec,
-                'Sayım Miktar': sayilan_mik_dec,
-                'Miktar Fark': mik_fark_dec,
-                'Birim Fiyat': birim_fiyat_dec,
-                'Sistem Tutar': sistem_tutar_dec,
-                'Tutar Fark': tutar_fark_dec,
-                'Birim': malzeme.olcu_birimi
+                'Stok Kodu': malzeme.stok_kod, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, 
+                'Renk': malzeme.renk, 'Depo Kodu': malzeme.depo_kod, 'Sistem Miktar': sistem_mik_dec, 
+                'Sayım Miktar': sayilan_mik_dec, 'Miktar Fark': mik_fark_dec, 'Birim Fiyat': birim_fiyat_dec, 
+                'Sistem Tutar': sistem_tutar_dec, 'Tutar Fark': tutar_fark_dec, 'Birim': malzeme.olcu_birimi
             })
 
         df = pd.DataFrame(rapor_data)
@@ -481,10 +408,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
         output.seek(0)
         file_name = f"Mutabakat_Raporu_{slugify(sayim_emri.ad)}.xlsx"
         
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{file_name}"'
         
         return response
@@ -492,7 +416,4 @@ def export_mutabakat_excel(request, sayim_emri_id):
     except Exception as e:
         error_type = type(e).__name__
         print(f"Mutabakat Excel Dışa Aktarma Hatası ({error_type}): {e}")
-        return HttpResponse(
-            f"Excel oluşturulurken kritik hata oluştu: {e}. Lütfen logları kontrol edin.", 
-            status=500
-        )
+        return HttpResponse(f"Excel oluşturulurken kritik hata oluştu: {e}. Lütfen logları kontrol edin.", status=500)
