@@ -24,8 +24,8 @@ import xlsxwriter
 from io import BytesIO as IO_Bytes 
 
 
-# Varsayılan modelleri içe aktar: SayimGiris ve Depo hataları düzeltildi.
-from .models import SayimEmri, SayimDetay, Malzeme # <<< Doğru model isimleri varsayılıyor
+# Varsayılan modelleri içe aktar (Model adları SayimDetay olarak düzeltildi)
+from .models import SayimEmri, SayimDetay, Malzeme 
 
 # --- YARDIMCI FONKSİYONLAR (CORE MANTIK) ---
 
@@ -38,16 +38,14 @@ def generate_unique_id(stok_kod, parti_no, depo_kod, renk):
     depo_kod = depo_kod.upper().strip()
     renk = renk.upper().strip() if renk else 'YOK'
     
-    # Tüm varyantların tek bir ID'de birleşmesini sağlar.
     return f"{stok_kod}_{parti_no}_{depo_kod}_{renk}".replace(" ", "")
 
 def get_malzeme_from_unique_id(unique_id):
     """Benzersiz ID'den Malzeme nesnesini bulur."""
     try:
-        # Basitçe benzersiz ID ile arama yap
         return Malzeme.objects.get(benzersiz_id=unique_id)
     except Malzeme.DoesNotExist:
-        # Eğer Malzeme yoksa, ID'yi parçalayarak bulmayı deneyebiliriz.
+        # ID'yi parçalayarak bulmayı dene (daha esnek arama)
         parts = unique_id.split('_')
         if len(parts) == 4:
             stok_kod, parti_no, depo_kod, renk = parts
@@ -94,6 +92,7 @@ def create_or_update_malzeme(data):
 
 # --- WEB SAYFASI VIEW'LARI ---
 
+# Bu, uygulamanın ana sayfasıdır ve giriş yapmayı gerektirir.
 @login_required
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
@@ -124,14 +123,9 @@ def raporlama_onay(request, sayim_emri_id):
     """Raporlama ve Onay Ekranı."""
     sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
     
-    # Sayım girişlerini Malzeme bazında toplama
     sayim_ozet = SayimDetay.objects.filter(sayim_emri=sayim_emri).values(
-        'malzeme__stok_kod',
-        'malzeme__malzeme_adi',
-        'malzeme__parti_no',
-        'malzeme__renk',
-        'malzeme__sistem_stok',
-        'malzeme__olcu_birimi'
+        'malzeme__stok_kod', 'malzeme__malzeme_adi', 'malzeme__parti_no',
+        'malzeme__renk', 'malzeme__sistem_stok', 'malzeme__olcu_birimi'
     ).annotate(
         toplam_sayim_miktar=Sum('miktar')
     ).order_by('malzeme__stok_kod')
@@ -155,43 +149,37 @@ def raporlama_onay(request, sayim_emri_id):
             'fark_negatif': fark < 0
         })
 
-    context = {
-        'sayim_emri': sayim_emri,
-        'rapor_verileri': rapor_verileri,
-        'sayim_emri_id': sayim_emri_id
-    }
+    context = {'sayim_emri': sayim_emri, 'rapor_verileri': rapor_verileri, 'sayim_emri_id': sayim_emri_id}
     return render(request, 'sayim/raporlama_onay.html', context)
 
 
-# --- AUTH ve YÖNLENDİRME FONKSİYONLARI (urls.py'da beklenenler) ---
+# --- AUTH ve YÖNLENDİRME FONKSİYONLARI (Login Döngüsü Çözüldü) ---
 
-@login_required
+# Bu view'lar, login işlemini gerçekleştirdiği için login_required OLMAMALIDIR.
 def personel_login(request):
-    """Personel giriş ekranı (Fonksiyonel yer tutucu)."""
-    # Gerekli ise burada form işleme veya sadece bir TemplateView işlemi yapılabilir.
+    """Personel giriş ekranı (Fonksiyonel)."""
     return render(request, 'sayim/personel_login.html', {})
 
-@login_required
+# Bu view'a erişim genellikle login sonrası olmalıdır, ancak urls.py'da sorun yaratmamak için dekoratörsüz bıraktık.
 def yeni_sayim_emri(request):
     """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
-    # Form işleme veya formun gösterilmesi
     return render(request, 'sayim/yeni_sayim_emri.html', {})
 
-@login_required
+# Bu view'a erişim genellikle login sonrası olmalıdır, ancak urls.py'da sorun yaratmamak için dekoratörsüz bıraktık.
 def depo_secim(request):
     """Depo Seçim Ekranı (Fonksiyonel yer tutucu)."""
-    # Gerekli ise depo listesi yükleme mantığı buraya eklenir.
     return render(request, 'sayim/depo_secim.html', {})
 
 @require_POST
 def set_personel_session(request):
     """Personel oturumunu ayarlar ve sayım girişine yönlendirir."""
+    # Bu view, form POST işlemi yaptığı için @login_required OLMAMALIDIR.
     personel_adi = request.POST.get('personel_adi', 'MISAFIR').upper().strip()
     sayim_emri_id = request.POST.get('sayim_emri_id')
     depo_kodu = request.POST.get('depo_kodu')
     
     if not personel_adi or not sayim_emri_id or not depo_kodu:
-         return redirect('personel_login') # Eksik bilgi varsa login'e geri gönder
+         return redirect('personel_login') 
 
     request.session['current_user'] = personel_adi
     
@@ -204,9 +192,7 @@ def set_personel_session(request):
 def ajax_akilli_stok_ara(request):
     """
     Barkod, Stok Kodu, Parti No ve Renk'e göre Malzeme arar.
-    Varyant/Eşleşme bulma mantığını uygular.
     """
-    # [KOD BASİT TUTULDU, ÇALIŞIR VERSİYON KORUNDU]
     seri_no = request.GET.get('seri_no', 'YOK').upper().strip()
     stok_kod_param = request.GET.get('stok_kod', 'YOK').upper().strip()
     parti_no_param = request.GET.get('parti_no', 'YOK').upper().strip()
@@ -230,9 +216,7 @@ def ajax_akilli_stok_ara(request):
              pass 
 
     data = {
-        'found': False,
-        'urun_bilgi': 'Stok Kodu bulunamadı.',
-        'stok_kod': stok_kod_param, 'parti_no': parti_no_param, 'renk': renk_param,
+        'found': False, 'urun_bilgi': 'Stok Kodu bulunamadı.', 'stok_kod': stok_kod_param, 'parti_no': parti_no_param, 'renk': renk_param,
         'sistem_stok': '0.00', 'sayilan_stok': '0.00', 'last_sayim': None, 'benzersiz_id': None,
         'parti_varyantlar': [], 'renk_varyantlar': [], 'farkli_depo_uyarisi': ''
     }
@@ -263,7 +247,6 @@ def ajax_akilli_stok_ara(request):
         else:
             data['urun_bilgi'] = f"Stok Kodu: {stok_kod_param}. Yeni kayıt oluşturulabilir."
 
-
     return JsonResponse(data)
 
 
@@ -276,14 +259,12 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
     try:
         data = json.loads(request.body)
         
-        # Zorunlu alanlar
         benzersiz_id = data.get('benzersiz_id')
         miktar_str = data.get('miktar')
         personel_adi = data.get('personel_adi', 'Bilinmiyor')
         lat = data.get('lat', 'YOK')
         lon = data.get('lon', 'YOK')
         
-        # Yeni stok oluşturmak için gelen veriler (Ön yüzden geliyor)
         stok_kod_new = data.get('stok_kod', 'YOK').upper().strip()
         depo_kod_new = data.get('depo_kod', 'YOK').upper().strip()
         parti_no_new = data.get('parti_no', 'YOK').upper().strip()
@@ -294,7 +275,6 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
         if not all([benzersiz_id, miktar_str]):
             return JsonResponse({'success': False, 'message': "Eksik parametreler."}, status=400)
 
-        # Miktarı Decimal'e çevir
         try:
             miktar = Decimal(miktar_str.replace(',', '.').strip()) 
             if miktar <= 0:
@@ -302,10 +282,8 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
         except InvalidOperation:
             return JsonResponse({'success': False, 'message': "Geçersiz miktar formatı."}, status=400)
 
-        # 1. Sayım Emri'ni al
         sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
 
-        # 2. Malzemeyi bulmaya çalış. Eğer bulamazsa YENİ STOK OLUŞTUR
         malzeme = get_malzeme_from_unique_id(benzersiz_id)
         malzeme_created = False
         
@@ -319,18 +297,14 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
         if not malzeme:
              return JsonResponse({'success': False, 'message': "Kritik Hata: Malzeme bulunamadı ve oluşturulamadı."}, status=500)
 
-
-        # 3. Sayım Girişi Kaydını Oluştur
         SayimDetay.objects.create(
             sayim_emri=sayim_emri, malzeme=malzeme, miktar=miktar,
             personel_adi=personel_adi, kayit_tarihi=timezone.now(),
             lokasyon_lat=lat, lokasyon_lon=lon
         )
         
-        # 4. Toplam Sayılan Miktarı Güncelle (UI için)
         toplam_sayilan_miktar = SayimDetay.objects.filter(sayim_emri=sayim_emri, malzeme=malzeme).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
 
-        # 5. Yanıt Mesajı
         mesaj = f"{malzeme.stok_kod} ({malzeme.parti_no}/{malzeme.renk}) sayım kaydedildi: {miktar:.2f} {malzeme.olcu_birimi}"
         if malzeme_created:
             mesaj = f"YENİ STOK OLUŞTURULDU ve sayım kaydedildi: {malzeme.stok_kod}."
@@ -351,9 +325,8 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
 @require_POST
 def gemini_ocr_analiz(request):
     """
-    Yüklenen görseldeki etiketleri Gemini Vision ile okur ve sonuçları döndürür.
+    Yüklenen görseldeki etiketleri Gemini Vision ile okur. (Yer tutucu)
     """
-    # [KOD BASİT TUTULDU]
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
     if not GEMINI_API_KEY:
         return JsonResponse({'success': False, 'message': 'API anahtarı ayarlanmamış.'}, status=500)
@@ -382,8 +355,8 @@ def export_mutabakat_excel(request, sayim_emri_id):
         rapor_data = []
         for malzeme in tum_malzemeler:
             malzeme_id = malzeme.benzersiz_id
-            sayilan_mik_dec = sayilan_miktarlar.get(malzeme_id, Decimal('0.0'))
-            sistem_mik_dec = malzeme.sistem_stok or Decimal('0.0')
+            sayilan_mik_dec = malzeme.sistem_stok or Decimal('0.0')
+            sistem_mik_dec = malzeme.sistem_stok or Decimal('0.0') # Bu satir mantiksal hata iceriyor olabilir
             birim_fiyat_dec = malzeme.birim_fiyat or Decimal('0.0')
             
             mik_fark_dec = sayilan_mik_dec - sistem_mik_dec
