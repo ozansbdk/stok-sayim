@@ -24,8 +24,8 @@ import xlsxwriter
 from io import BytesIO as IO_Bytes 
 
 
-# Varsayılan modelleri içe aktar (SayimGiris -> SayimDetay olarak düzeltildi)
-from .models import SayimEmri, SayimDetay, Malzeme, Depo # <<< SayimDetay düzeltildi!
+# Varsayılan modelleri içe aktar: Depo kaldırıldı.
+from .models import SayimEmri, SayimDetay, Malzeme # <<< Depo kaldırıldı!
 
 # --- YARDIMCI FONKSİYONLAR (CORE MANTIK) ---
 
@@ -47,7 +47,7 @@ def get_malzeme_from_unique_id(unique_id):
         # unique_id parçalarına ayırarak malzemeyi bulma
         parts = unique_id.split('_')
         if len(parts) != 4:
-            # Sadece 4 parçalı formatı destekliyoruz, aksi halde hata döner.
+            # Sadece 4 parçalı formatı desteklemiyoruz, direkt benzersiz ID ile arıyoruz.
             return Malzeme.objects.get(benzersiz_id=unique_id)
         
         stok_kod = parts[0]
@@ -416,25 +416,14 @@ def gemini_ocr_analiz(request):
     if 'image_file' not in request.FILES:
         return JsonResponse({'success': False, 'message': 'Görsel dosyası bulunamadı.'}, status=400)
     
-    image_file = request.FILES['image_file']
+    # ... (kodun geri kalanı) ...
     
-    try:
-        # Kodun geri kalanı... (kodu yer kazanmak için çıkardım, varsayımsal olarak doğru)
-        # ...
-
-        return JsonResponse({
-            'success': True,
-            'message': f"Başarıyla X etiket okundu.",
-            'count': 1,
-            'results': [] # Varsayımsal sonuç
-        })
-
-    except requests.exceptions.RequestException as e:
-        print(f"Gemini API Hatası: {e}")
-        return JsonResponse({'success': False, 'message': f"Gemini API isteğinde hata: {e}"}, status=500)
-    except Exception as e:
-        print(f"Genel Analiz Hatası: {e}")
-        return JsonResponse({'success': False, 'message': f"Görsel işleme sırasında beklenmeyen bir hata oluştu: {e}"}, status=500)
+    return JsonResponse({
+        'success': False,
+        'message': 'Gemini Analizi için kod tamamlanmadı.',
+        'count': 0,
+        'results': []
+    })
 
 
 # --- EXCEL EXPORT --- 
