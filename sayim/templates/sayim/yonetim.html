@@ -28,17 +28,17 @@
             <h2>1. Stok Verilerini Yeniden Yükle/Güncelle</h2>
             <p>Mevcut Malzeme listesini siler/günceller. **Lütfen bilgisayarınızdaki Excel dosyasını seçin.**</p>
             
-            <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" required class="file-input">
+            <input type="file" id="excel-file" name="excel_file" accept=".xlsx, .xls, .csv" required class="file-input">
             
             <button id="reload-btn" class="btn-action btn-success">EXCEL'DEN YÜKLEMEYİ BAŞLAT</button>
             <div id="reload-message" class="mesaj"></div>
         </div>
 
         <div class="islem-kutusu">
-            <h2>2. Tüm Sayım Kayıtlarını SIFIRLA</h2>
-            <p>Bu işlem, tüm Sayım Emirleri ve Sayım Detayları'nı **kalıcı olarak siler** (Malzemeler tablosu hariç).</p>
+            <h2>2. Tüm Sayım Kayıtlarını SIFIRLA (Devre Dışı)</h2>
+            <p>Bu işlem, tüm Sayım Emirleri ve Sayım Detayları'nı **kalıcı olarak siler**.</p>
             
-            <button id="reset-btn" class="btn-action btn-danger">TÜM SAYIM VERİLERİNİ SİL</button>
+            <button id="reset-btn" class="btn-action btn-danger" disabled>TÜM SAYIM VERİLERİNİ SİL (Fonksiyon Yok)</button>
             <div id="reset-message" class="mesaj"></div>
         </div>
     </div>
@@ -60,27 +60,7 @@
         }
     }
 
-    // 1. Sayım Verisi Sıfırlama (AJAX)
-    document.getElementById('reset-btn').addEventListener('click', () => {
-        if (!confirm('UYARI: Bu işlem geri alınamaz! Tüm sayım emirleri ve detayları silinecektir. Emin misiniz?')) {
-            return;
-        }
-        
-        document.getElementById('reset-message').innerText = 'Sıfırlanıyor...';
-        document.getElementById('reset-message').className = 'mesaj';
-        document.getElementById('reset-message').style.display = 'block';
-        
-        // reset_sayim_data URL'si için AJAX çağrısı
-        fetch('{% url "reset_sayim_data" %}', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': CSRF_TOKEN }
-        })
-        .then(res => res.json())
-        .then(data => handleResponse(data, 'reset-message'))
-        .catch(error => handleResponse({ success: false, message: `Sunucu bağlantı hatası: ${error}` }, 'reset-message'));
-    });
-
-    // 2. Stok Verisi Yeniden Yükleme (AJAX)
+    // 1. Stok Verisi Yeniden Yükleme (AJAX)
     document.getElementById('reload-btn').addEventListener('click', () => {
         const fileInput = document.getElementById('excel-file');
         const file = fileInput.files[0];
@@ -91,16 +71,15 @@
         }
 
         const formData = new FormData();
-        formData.append('excel_file', file); // 'excel_file' adıyla dosyayı ekle
+        formData.append('excel_file', file);
 
         document.getElementById('reload-message').innerText = 'Yükleniyor... Bu işlem biraz sürebilir.';
         document.getElementById('reload-message').className = 'mesaj';
         document.getElementById('reload-message').style.display = 'block';
         
         // upload_stok_data URL'si için AJAX çağrısı
-        fetch('{% url "upload_stok_data" %}', { // <<< urls.py'daki adınız
+        fetch('{% url "upload_stok_data" %}', { // <<< urls.py'daki doğru URL adı
             method: 'POST',
-            // Content-Type başlığını FormData kullandığımızda AYARLAMIYORUZ.
             headers: { 'X-CSRFToken': CSRF_TOKEN },
             body: formData 
         })
@@ -109,13 +88,18 @@
             if (status === 200 && body.success) {
                 handleResponse(body, 'reload-message');
             } else {
-                // Sunucu hata kodu (400, 500) veya success: false döndüğünde
                 handleResponse({ success: false, message: body.message || 'Bilinmeyen sunucu hatası.' }, 'reload-message');
             }
         })
         .catch(error => {
              handleResponse({ success: false, message: `Kritik Hata: Bağlantı sorunu. ${error}` }, 'reload-message');
         });
+    });
+
+    // 2. Sayım Verisi Sıfırlama (Devre Dışı Bırakıldı)
+    // Bu kısım, reset_sayim_data'nın artık views.py'da tanımlı olmamasından kaynaklanan hatayı engeller.
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        alert('Bu fonksiyon devre dışı bırakılmıştır. Lütfen sunucu yöneticinize danışın.');
     });
 </script>
 </body>
