@@ -34,7 +34,8 @@ from django.utils.text import slugify
 from PIL import Image
 import pandas as pd
 from PIL import Image, ImageFile
-import xlsxwriter # <-- EK KONTROL: Excel yazmak için gerekli
+import xlsxwriter # Excel yazmak için gerekli
+from xlsxwriter.utility import xl_rowcol_to_cell # Hücre adları için (opsiyonel ama işimize yarayabilir)
 
 # --- YÖNTEM 1 (TEŞHİS İÇİN): 'types' import'u devre dışı bırakıldı ---
 # Gemini (Google GenAI) Imports
@@ -797,7 +798,6 @@ def gemini_ocr_analiz(request):
         
         prompt = ("Analyze labels, create JSON list with 'stok_kod', 'parti_no', 'renk', 'miktar'. Quantity as decimal.")
         
-        # --- TEŞHİS İÇİN GenerationConfig GEÇİCİ OLARAK KALDIRILDI ---
         # response = model.generate_content([prompt, img], generation_config=generation_config) # Config olmadan çağır
         response = model.generate_content([prompt, img]) # Config olmadan çağırıyoruz
         print(f"Gemini API Çağrısı: Model={model_name}")
@@ -891,10 +891,10 @@ def gemini_ocr_analiz(request):
         return JsonResponse({'success': False, 'message': f"Görsel analizi sırasında beklenmedik sunucu hatası ({error_type})."}, status=500)
 
 
-# --- EXCEL EXPORT --- (Mutabakat Excel artık çalışır durumda!)
+# --- EXCEL EXPORT --- 
 @csrf_exempt
 def export_excel(request, sayim_emri_id): 
-    # Bu, temel rapor için placeholder olarak kalabilir, Mutabakat Excel'i tamamladık.
+    # Temel rapor için placeholder olarak kaldı.
     se = get_object_or_404(SayimEmri, pk=sayim_emri_id); 
     return HttpResponse(f"'{se.ad}' Excel Raporu Henüz Yok.", status=501)
 
@@ -908,13 +908,10 @@ def export_mutabakat_excel(request, sayim_emri_id):
     try:
         # 1. Sayım Detaylarını ve Malzeme verilerini çekme ve hesaplama (RaporlamaView mantığı)
         sayim_detaylari = SayimDetay.objects.filter(sayim_emri=sayim_emri).select_related('benzersiz_malzeme')
-        # Sadece sayım emriyle ilişkili malzemeleri alarak performansı artırabiliriz
-        benzersiz_malzeme_ids = sayim_detaylari.values_list('benzersiz_malzeme__benzersiz_id', flat=True).distinct()
-        tum_malzemeler = Malzeme.objects.filter(benzersiz_id__in=benzersiz_malzeme_ids)
         
-        # Ek olarak, hiç sayılmamış ancak sistemde olanları da eklemek için:
-        # Bu kısım RaporlamaView'daki gibi tüm malzemeleri çekmeyi gerektirir. Basitlik için tümünü alalım:
-        tum_malzemeler = Malzeme.objects.all().prefetch_related('sayimdetay_set')
+        # Hata düzeltildi: prefetch_related kaldırıldı, tüm malzemeler çekiliyor.
+        # Bu, hiç sayılmamış sistem stoklarının da rapora dahil edilmesini sağlar.
+        tum_malzemeler = Malzeme.objects.all()
 
         sayilan_miktarlar = {}
         for detay in sayim_detaylari:
@@ -961,6 +958,13 @@ def export_mutabakat_excel(request, sayim_emri_id):
         # Sayfa adını temizle ve kısalt
         sheet_name = slugify(sayim_emri.ad)[:30].replace('-', '_').upper() or 'MUTABAKAT'
         df.to_excel(writer, sheet_name=sheet_name, index=False)
+        
+        # Yazar nesnesini kapatmadan önce bir formatlama yapabiliriz (opsiyonel)
+        # workbook = writer.book
+        # worksheet = writer.sheets[sheet_name]
+        # currency_format = workbook.add_format({'num_format': '#,##0.00'})
+        # worksheet.set_column('J:L', 15, currency_format) # Tutar sütunlarına format uygulama
+        
         writer.close() # close() çağrısı ile içeriği yazar
 
         # Yanıtı hazırla
@@ -977,9 +981,11 @@ def export_mutabakat_excel(request, sayim_emri_id):
 
     except Exception as e:
         error_type = type(e).__name__
+        # Hata log kaydını bas
         print(f"Mutabakat Excel Dışa Aktarma Hatası ({error_type}): {e}")
+        
         # Hata durumunda kullanıcıya bilgilendirici bir mesaj döndür
         return HttpResponse(
-            f"Excel oluşturulurken kritik hata oluştu: {e}", 
+            f"Excel oluşturulurken kritik hata oluştu: {e}. Lütfen logları kontrol edin.", 
             status=500
         )
