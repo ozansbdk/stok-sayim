@@ -3,6 +3,7 @@
 import json
 import time
 import os
+import pytz
 from datetime import datetime
 from io import BytesIO
 import base64
@@ -410,6 +411,11 @@ class KonumAnaliziView(DetailView):
 
         markers = []
         gecersiz_koordinat_sayisi = 0
+        
+        # --- *** REVİZE: Saat dilimi eklendi *** ---
+        tr_tz = pytz.timezone("Europe/Istanbul") # Türkiye saat dilimini tanımla
+        # --- *** REVİZE BİTTİ *** ---
+
         for item in konum_data_qs:
             try:
                 lat_str = str(item['latitude']).replace(',', '.').strip()
@@ -420,9 +426,26 @@ class KonumAnaliziView(DetailView):
                      print(f"Uyarı: Koordinatlar Türkiye sınırı dışında atlandı: Lat={lat}, Lng={lng}")
                      gecersiz_koordinat_sayisi += 1
                      continue
+                     
+                # --- *** REVİZE: Saat dilimi çevrimi *** ---
+                tarih_str = 'Bilinmiyor'
+                if item['kayit_tarihi']:
+                    try:
+                        kayit_tarihi_utc = item['kayit_tarihi']
+                        # Veritabanından gelenin 'aware' (UTC) olduğundan emin ol
+                        if timezone.is_naive(kayit_tarihi_utc):
+                             kayit_tarihi_utc = timezone.make_aware(kayit_tarihi_utc, timezone.utc)
+                        
+                        kayit_tarihi_local = kayit_tarihi_utc.astimezone(tr_tz) # TR saatine çevir
+                        tarih_str = kayit_tarihi_local.strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception as e:
+                        print(f"Tarih çevirme hatası: {e}")
+                        tarih_str = item['kayit_tarihi'].strftime("%Y-%m-%d %H:%M:%S") # Hata olursa eskisi gibi göster
+                # --- *** REVİZE BİTTİ *** ---
+                     
                 markers.append({
                     'personel': item['personel_adi'], 'lat': lat, 'lng': lng,
-                    'tarih': item['kayit_tarihi'].strftime("%Y-%m-%d %H:%M:%S") if item['kayit_tarihi'] else 'Bilinmiyor',
+                    'tarih': tarih_str, # Çevrilmiş saati kullan
                     'stok': float(item['sayilan_stok'] if isinstance(item['sayilan_stok'], Decimal) else Decimal(str(item['sayilan_stok'] or '0.0'))) 
                 })
             except (ValueError, TypeError) as coord_err:
