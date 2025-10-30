@@ -49,7 +49,7 @@ def get_malzeme_from_unique_id(unique_id):
         if len(parts) == 4:
             stok_kod, parti_no, depo_kod_alias, renk = parts
             try:
-                # MODEL ALANI DÜZELTİLDİ: lokasyon_kodu
+                # MODEL ALANI: lokasyon_kodu
                 return Malzeme.objects.get(
                     stok_kod=stok_kod, parti_no=parti_no, lokasyon_kodu=depo_kod_alias, renk=renk
                 )
@@ -208,6 +208,7 @@ def yonetim_araclari(request):
 def upload_and_reload_stok_data(request):
     """
     Excel/CSV dosyasından Malzeme listesini okur ve veritabanına yükler/günceller (UPSERT).
+    KRİTİK DÜZELTME: Excel başlıklarına (Depo Kodu, Maliyet birim) göre ayarlandı.
     """
     if 'excel_file' not in request.FILES: 
         return JsonResponse({'success': False, 'message': 'Dosya bulunamadı.'}, status=400)
@@ -219,7 +220,6 @@ def upload_and_reload_stok_data(request):
         
         # Dosya türüne göre okuma (CSV veya XLSX)
         if excel_file.name.endswith('.csv'):
-             # UTF-8 ve diğer kodlamaları deneme (CSV'ler için gerekli)
              try:
                  df = pd.read_csv(excel_io, encoding='utf-8', sep=None, engine='python', dtype=str, keep_default_na=False)
              except:
@@ -231,8 +231,9 @@ def upload_and_reload_stok_data(request):
         # Sütun başlıklarını temizleme
         df.columns = df.columns.str.strip()
         
-        # Gerekli minimum sütunlar (Sizin model alan adlarınıza göre ayarlandı)
-        required_cols = ["Stok Kodu", "Miktar", "Lokasyon Kodu"] 
+        # --- KRİTİK BAŞLIK KONTROLÜ VE ALAN EŞLEŞTİRME ---
+        # Excel'deki başlıklar burada bekleniyor.
+        required_cols = ["Stok Kodu", "Miktar", "Depo Kodu", "Maliyet birim", "Birim"] 
         missing_cols = [col for col in required_cols if col not in df.columns]
         
         if missing_cols:
@@ -240,7 +241,7 @@ def upload_and_reload_stok_data(request):
 
         # Varsayılan değerler
         defaults = {
-             "Parti": 'YOK', "Renk": 'YOK', "Stok Adı": '', "Birim": 'ADET', "Birim Fiyat": '0.0'
+             "Parti": 'YOK', "Renk": 'YOK', "Stok Adı": '', "seri_no": 'YOK', "barkod": 'YOK'
         }
         for col, dv in defaults.items():
              if col not in df.columns: df[col] = dv
@@ -252,18 +253,18 @@ def upload_and_reload_stok_data(request):
                 try:
                     # Değerleri al ve standardize et
                     stok_kod = row['Stok Kodu'].upper().strip()
-                    lokasyon_kodu = row['Lokasyon Kodu'].upper().strip() # <<< Düzeltildi
+                    lokasyon_kodu = row['Depo Kodu'].upper().strip() # <<< EXCEL BAŞLIĞI: Depo Kodu
                     parti_no = row['Parti'].upper().strip()
                     renk = row['Renk'].upper().strip()
                     
                     if not stok_kod or not lokasyon_kodu: raise ValueError("Stok/Depo Kodu boş olamaz.")
                     
-                    # Miktar ve Fiyatı Decimal'e çevir
+                    # Miktar ve Fiyatı Decimal'e çevir (virgül yerine nokta kabul et)
                     miktar_str = str(row['Miktar']).replace(',', '.').strip()
-                    fiyat_str = str(row['Birim Fiyat']).replace(',', '.').strip()
+                    fiyat_str = str(row['Maliyet birim']).replace(',', '.').strip()
                     
-                    stok_miktari = Decimal(miktar_str)
-                    birim_fiyati = Decimal(fiyat_str)
+                    stok_miktari = Decimal(miktar_str) if miktar_str else Decimal('0.0')
+                    birim_fiyati = Decimal(fiyat_str) if fiyat_str else Decimal('0.0')
                     
                     bid = generate_unique_id(stok_kod, parti_no, lokasyon_kodu, renk)
                     
@@ -273,12 +274,14 @@ def upload_and_reload_stok_data(request):
                         defaults={
                             'stok_kod': stok_kod,
                             'malzeme_adi': row['Stok Adı'] or f"Stok {stok_kod}",
-                            'lokasyon_kodu': lokasyon_kodu,
+                            'lokasyon_kodu': lokasyon_kodu, # Modeldeki doğru alan adı
                             'parti_no': parti_no,
                             'renk': renk,
                             'olcu_birimi': row['Birim'],
                             'sistem_stok': stok_miktari,
-                            'birim_fiyat': birim_fiyati
+                            'birim_fiyat': birim_fiyati,
+                            'seri_no': row['seri_no'] if 'seri_no' in row else 'YOK', # Opsiyonel alan
+                            'barkod': row['barkod'] if 'barkod' in row else 'YOK', # Opsiyonel alan
                         }
                     )
                     
@@ -475,7 +478,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
             
             rapor_data.append({
                 'Stok Kodu': malzeme.stok_kod, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, 
-                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, 
+                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, # <<< Düzeltildi
                 'Sistem Miktar': sistem_mik_dec, 'Sayım Miktar': sayilan_mik_dec, 'Miktar Fark': mik_fark_dec, 
                 'Birim Fiyat': birim_fiyat_dec, 'Sistem Tutar': sistem_tutar_dec, 'Tutar Fark': tutar_fark_dec, 
                 'Birim': malzeme.olcu_birimi
