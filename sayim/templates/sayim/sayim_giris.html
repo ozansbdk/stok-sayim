@@ -77,8 +77,7 @@
             <p class="message warning" style="margin-top:10px; text-align:left;">⚠️ Gemini özelliği şu anda aktif değil. Lütfen API anahtarını kontrol edin.</p>
         {% endif %}
         
-        <p id="gemini_mesaj" class="message" style="display: none;"></p> <!-- Başlangıçta gizli -->
-    </div>
+        <p id="gemini_mesaj" class="message" style="display: none;"></p> </div>
     
     <div id="toplu_sonuc_alani" style="margin-top: 20px; border: 1px solid #007bff; padding: 15px; border-radius: 4px; display: none;">
         <h3 class="section-header" style="border-bottom: none;">Okunan Toplu Etiketler (<span id="toplu_sonuc_sayisi">0</span> Adet)</h3>
@@ -92,8 +91,7 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Sonuçlar buraya eklenecek -->
-            </tbody>
+                </tbody>
         </table>
     </div>
 
@@ -114,21 +112,14 @@
     <div id="urun_bilgi_alani" style="margin-top: 15px;" class="status-default">
         <p>Ürün: <strong id="urun_bilgi">Stok kodu veya Barkod girin...</strong></p>
         <p>Sistem Stoğu: <strong id="sistem_stok_goster">0.00</strong></p>
-        <p>Bu Sayımdaki Toplam: <strong id="sayilan_stok_goster">0.00</strong></p> <!-- Güncel sayım toplamı eklendi -->
-        <p>Son Sayım (Genel): <strong id="last_sayim_goster">Bilinmiyor</strong></p>
-        <p id="farkli_depo_uyari_alani"></p> <!-- Farklı depo uyarısı için alan -->
-    </div>
+        <p>Bu Sayımdaki Toplam: <strong id="sayilan_stok_goster">0.00</strong></p> <p>Son Sayım (Genel): <strong id="last_sayim_goster">Bilinmiyor</strong></p>
+        <p id="farkli_depo_uyari_alani"></p> </div>
 
     <hr>
 
     <h2>2. Sayım Girişi</h2>
     
-    <input type="number" id="miktar_input" placeholder="Sayım Miktarı (Örn: 1.00)" step="0.01"> <!-- step eklendi -->
-    <button id="sayim_kaydet_btn" style="background-color: #28a745;" disabled>KAYDET (**ENTER**)</button> <!-- Başlangıçta disabled -->
-    <p class="message" id="kayit_mesaji" style="display:none;"></p> <!-- Başlangıçta gizli -->
-
-
-<script>
+    <input type="number" id="miktar_input" placeholder="Sayım Miktarı (Örn: 1.00)" step="0.01"> <button id="sayim_kaydet_btn" style="background-color: #28a745;" disabled>KAYDET (**ENTER**)</button> <p class="message" id="kayit_mesaji" style="display:none;"></p> <script>
     // **********************************************
     // GLOBAL DEĞİŞKENLER VE TEMEL FONKSİYONLAR
     // **********************************************
@@ -137,6 +128,7 @@
     let PERSONEL_ADI = 'MISAFIR';
     const SAYIM_EMRI_ID = "{{ sayim_emri_id }}"; // View'dan gelen garanti ID
     
+    const GEMINI_AVAILABLE = {{ gemini_available|yesno:"true,false" }};
     // Aktif olarak seçili/bulunan ürünün bilgilerini tutar
     let currentBenzersizId = null; // <-- KESİN ÇÖZÜM İÇİN EKLENDİ
     let currentStokKod = '';
@@ -241,11 +233,11 @@
         const createSelect = (id, optionsList, selectedValue) => {
             let optionsHTML = `<option value="YOK" ${!selectedValue || selectedValue === 'YOK' ? 'selected' : ''}>-- Seç --</option>`; // Başlangıç seçeneği
              optionsHTML += optionsList.map(opt => 
-                 `<option value="${opt}" ${selectedValue === opt ? 'selected' : ''}>${opt}</option>`
+                `<option value="${opt}" ${selectedValue === opt ? 'selected' : ''}>${opt}</option>`
              ).join('');
              return `<select id="${id}">${optionsHTML}</select>`;
         };
-             
+              
         // Parti No
         if (data.parti_varyantlar && data.parti_varyantlar.length > 0) {
             partiNoContainer.innerHTML = createSelect('parti_no_input', data.parti_varyantlar, data.parti_no);
@@ -276,22 +268,19 @@
             parti_no: partiNo,
             renk: renk,
             depo_kod: depoKod,
-            // barkod_ham_veri artık gerekli değil gibi ama kalsın
             barkod_ham_veri: seriNo !== 'YOK' ? seriNo : 'YOK', 
-            sayim_emri_id: SAYIM_EMRI_ID // Sayılan miktarı çekmek için gerekli olabilir
+            sayim_emri_id: SAYIM_EMRI_ID 
         });
 
-        // Backend endpoint'i
         const url = `{% url 'ajax_akilli_stok_ara' %}?${params.toString()}`;
 
         fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    // Sunucudan gelen hata mesajını göstermeye çalış
                     return response.json().then(errData => {
-                         throw new Error(`Sunucu Hatası (${response.status}): ${errData.urun_bilgi || errData.message || 'Bilinmeyen hata'}`);
+                        throw new Error(`Sunucu Hatası (${response.status}): ${errData.urun_bilgi || errData.message || 'Bilinmeyen hata'}`);
                     }).catch(() => {
-                         throw new Error(`Sunucu Hatası (${response.status}). Yanıt alınamadı veya JSON değil.`);
+                        throw new Error(`Sunucu Hatası (${response.status}). Yanıt alınamadı veya JSON değil.`);
                     });
                 }
                 return response.json();
@@ -302,10 +291,9 @@
             .catch(error => {
                 console.error("Akıllı Arama Hatası:", error);
                 showMessage('kayit_mesaji', `Arama Hatası: ${error.message}`, 'error');
-                // Arayüzü hata durumuna getir
                  updateUIAfterSearch({ 
-                     found: false, urun_bilgi: `Arama Hatası: ${error.message}`,
-                     stok_kod: stokKod, parti_no: partiNo, renk: renk // Girilen değerleri koru
+                    found: false, urun_bilgi: `Arama Hatası: ${error.message}`,
+                    stok_kod: stokKod, parti_no: partiNo, renk: renk 
                  });
             });
     }
@@ -327,9 +315,6 @@
         
         const formData = new FormData();
         formData.append('image_file', file);
-        // Sayım emri ID veya depo kodu OCR için gerekli değilse kaldırılabilir
-        // formData.append('sayim_emri_id', SAYIM_EMRI_ID); 
-        // formData.append('depo_kodu', DEPO_KODU);
 
         fetch('{% url "gemini_ocr_analiz" %}', {
             method: 'POST',
@@ -337,13 +322,11 @@
             body: formData
         })
         .then(res => {
-             // Durum koduna göre JSON parse etmeyi dene veya hata fırlat
              if (!res.ok) {
                  return res.json().then(errData => {
-                      throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen YZ hatası'}`);
+                     throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen YZ hatası'}`);
                  }).catch(() => {
-                     // JSON yoksa genel hata
-                      throw new Error(`Sunucu Hatası (${res.status})`);
+                     throw new Error(`Sunucu Hatası (${res.status})`);
                  });
              }
              return res.json();
@@ -368,13 +351,11 @@
                         barkodInput.value = item.barkod !== 'YOK' ? item.barkod : '';
                         stokKodInput.value = item.stok_kod !== 'YOK' ? item.stok_kod : '';
                         miktarInput.value = item.miktar;
-                         // Parti ve Renk inputlarını bulup güncelle
                          const partiEl = document.getElementById('parti_no_input');
                          if(partiEl) partiEl.value = item.parti_no !== 'YOK' ? item.parti_no : '';
                          const renkEl = document.getElementById('renk_input');
                          if(renkEl) renkEl.value = item.renk !== 'YOK' ? item.renk : '';
 
-                        // Seçilen ürünü otomatik ara (Barkod varsa barkodla, yoksa stokla)
                         akilliStokAra(
                             item.barkod !== 'YOK' ? item.barkod : 'YOK', 
                             item.barkod === 'YOK' ? item.stok_kod : 'YOK', // Barkod yoksa stokla ara
@@ -382,7 +363,6 @@
                             item.renk, 
                             DEPO_KODU
                         );
-                        // Seçilen satırı vurgula
                          Array.from(sonucTablosuBody.rows).forEach(r => r.style.backgroundColor = '');
                          row.style.backgroundColor = '#e6f7ff';
                     };
@@ -391,7 +371,6 @@
                 topluSonucAlani.style.display = 'block';
 
             } else {
-                // Başarılı ama sonuç yok veya success false ise
                 showMessage('gemini_mesaj', data.message || 'Görselde geçerli etiket bulunamadı.', 'warning');
             }
         })
@@ -400,7 +379,6 @@
             showMessage('gemini_mesaj', `❌ YZ Hatası: ${error.message}`, 'error');
         })
         .finally(() => {
-             // Butonları tekrar aktif yap
              selectFileBtn.disabled = false; 
              cameraBtn.disabled = false;
         });
@@ -410,7 +388,7 @@
     // 4. KONUM ALMA (ASYNC)
     // **********************************************
     function getCurrentLocation() {
-        return new Promise((resolve) => { // reject kaldırıldı, her zaman çözülecek
+        return new Promise((resolve) => { 
             if (!navigator.geolocation) {
                 resolve({ latitude: 'YOK', longitude: 'YOK', error: 'Tarayıcı desteklemiyor' });
                 return;
@@ -420,11 +398,10 @@
                     resolve({
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude,
-                        error: null // Başarılı
+                        error: null 
                     });
                 },
                 (error) => {
-                    // Hata koduna göre mesajı belirle
                     let message = 'Konum alınamadı';
                     switch (error.code) {
                         case error.PERMISSION_DENIED: message = 'Konum izni reddedildi'; break;
@@ -433,7 +410,7 @@
                     }
                     resolve({ latitude: 'YOK', longitude: 'YOK', error: message });
                 },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } // timeout süresi ayarlandı
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } 
             );
         });
     }
@@ -445,42 +422,42 @@
     async function kaydetSayim() { // async yapıldı
         const miktarValue = miktarInput.value;
         
-        // --- KESİN ÇÖZÜM: Benzersiz ID kontrolü ---
         if (!currentBenzersizId) { 
             showMessage('kayit_mesaji', 'Lütfen önce geçerli bir stok arayın veya seçin.', 'error');
             return;
         }
-        // Miktar kontrolü
+
+        // --- *** REVİZE 2: 'Decimal' JS'de yoktur, 'parseFloat' kullanıldı *** ---
         let miktarDecimal;
         try {
-             miktarDecimal = Decimal(miktarValue.replace(',', '.')); // Virgülü noktaya çevir
-             if (miktarDecimal.isNaN() || miktarDecimal.lte(0)) { // <= 0 kontrolü
+             // miktarDecimal = Decimal(miktarValue.replace(',', '.')); // HATALI KOD
+             miktarDecimal = parseFloat(miktarValue.replace(',', '.')); // DOĞRU KOD
+             // if (miktarDecimal.isNaN() || miktarDecimal.lte(0)) { // HATALI KOD
+             if (isNaN(miktarDecimal) || miktarDecimal <= 0) { // DOĞRU KOD
                  throw new Error("Miktar sıfırdan büyük olmalıdır.");
              }
         } catch {
              showMessage('kayit_mesaji', 'Geçersiz miktar girdiniz. Lütfen sayısal bir değer girin (örn: 1.00).', 'error');
              return;
         }
+        // --- *** REVİZE 2 BİTTİ *** ---
 
-        showMessage('kayit_mesaji', 'Konum bilgisi alınıyor...', 'info', 0); // Kapanmasın
-        kaydetBtn.disabled = true; // Kayıt sırasında butonu pasif yap
+        showMessage('kayit_mesaji', 'Konum bilgisi alınıyor...', 'info', 0); 
+        kaydetBtn.disabled = true; 
 
         const locationData = await getCurrentLocation(); // Konumu al
         
         showMessage('kayit_mesaji', 'Kaydediliyor...', 'info', 0); 
 
         const dataToSend = {
-            // --- KESİN ÇÖZÜM: Benzersiz ID'yi gönder ---
             benzersiz_id: currentBenzersizId, 
-            miktar: miktarValue, // String olarak gönder, backend Decimal'e çevirir
+            miktar: miktarValue, 
             personel_adi: PERSONEL_ADI,
             lat: locationData.latitude,
             lon: locationData.longitude
-            // Backend artık stok_kod, parti_no, renk, depo_kod'a ihtiyaç duymuyor
         };
 
-        // Backend endpoint'i (re_path ile sonda / opsiyonel)
-        const url = `/ajax/sayim-kaydet/${SAYIM_EMRI_ID}`; // Doğrudan URL oluştur
+        const url = `/ajax/sayim-kaydet/${SAYIM_EMRI_ID}`; 
 
         fetch(url, {
             method: 'POST',
@@ -491,12 +468,11 @@
             body: JSON.stringify(dataToSend)
         })
         .then(res => {
-             // Sunucu hatası durumunda JSON'u okumayı dene
              if (!res.ok) {
                  return res.json().then(errData => {
-                      throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen kayıt hatası'}`);
+                     throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen kayıt hatası'}`);
                  }).catch(() => {
-                      throw new Error(`Sunucu Hatası (${res.status}). Kayıt başarısız.`);
+                     throw new Error(`Sunucu Hatası (${res.status}). Kayıt başarısız.`);
                  });
              }
              return res.json();
@@ -504,25 +480,19 @@
         .then(data => {
             if (data.success) {
                 let successMessage = data.message;
-                 // Konum hatası varsa uyarıyı mesaja ekle
                  if (locationData.error && locationData.error !== 'Tarayıcı desteklemiyor') {
                      successMessage += ` (Uyarı: ${locationData.error})`;
-                     showMessage('kayit_mesaji', successMessage, 'warning', 7000); // Daha uzun göster
+                     showMessage('kayit_mesaji', successMessage, 'warning', 7000); 
                  } else {
                      showMessage('kayit_mesaji', successMessage, 'success');
                  }
-                sayilanStokGoster.innerText = data.yeni_miktar || '0.00'; // Toplamı güncelle
-                miktarInput.value = ''; // Miktar alanını temizle
-                barkodInput.focus(); // Barkod alanına geri odaklan (hızlı giriş için)
-                barkodInput.select(); // İçeriği seç
-                
-                // Kayıt sonrası ürünü sıfırlayalım mı? Yoksa aynı ürüne devam mı?
-                // Şimdilik sıfırlamayalım, belki aynı üründen tekrar girilecek.
-                // resetUIBeforeSearch(); // İsterseniz aktif edilebilir.
+                sayilanStokGoster.innerText = data.yeni_miktar || '0.00'; 
+                miktarInput.value = ''; 
+                barkodInput.focus(); 
+                barkodInput.select(); 
                 
             } else {
-                // Backend'den gelen hata mesajı
-                showMessage('kayit_mesaji', `HATA: ${data.message}`, 'error', 0); // Kapanmasın
+                showMessage('kayit_mesaji', `HATA: ${data.message}`, 'error', 0); 
             }
         })
         .catch(error => {
@@ -530,7 +500,6 @@
             showMessage('kayit_mesaji', `Kritik Kayıt Hatası: ${error.message}`, 'error', 0);
         })
         .finally(() => {
-            // Hata olsa bile butonu tekrar aktif yap (eğer ürün hala seçiliyse)
             if (currentBenzersizId) {
                 kaydetBtn.disabled = false; 
             }
@@ -541,24 +510,19 @@
     // 6. OLAY DİNLEYİCİLERİ KURULUMU
     // **********************************************
     function setupEventListeners() {
-        // Arama Butonu
         araBtn.addEventListener('click', handleManualSearch);
         
-        // Arama Inputları (Enter ve Değişim)
-        setupAutoSearchListeners(); // Bu fonksiyon inputları bulup dinleyici ekler
+        setupAutoSearchListeners(); 
 
-        // Miktar Input (Enter ile Kaydet)
         miktarInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
-                event.preventDefault(); // Form göndermesini engelle
+                event.preventDefault(); 
                 kaydetSayim();
             }
         });
 
-        // Kaydet Butonu
         kaydetBtn.addEventListener('click', kaydetSayim);
 
-        // Gemini Butonları
         selectFileBtn.addEventListener('click', () => {
              imageInput.removeAttribute('capture'); 
              imageInput.click();
@@ -571,8 +535,7 @@
              if (this.files && this.files.length > 0) {
                  geminiOku(this.files[0]); 
              }
-             // capture attribute'unu temizle (her seferinde sormasın)
-             this.value = null; // Aynı dosyayı tekrar seçebilmek için
+             this.value = null; 
              this.removeAttribute('capture'); 
          });
     }
@@ -596,11 +559,9 @@
 
         elementsToListen.forEach(input => {
             if (input) {
-                // Önceki dinleyicileri kaldır (varsa)
                 input.removeEventListener('keydown', handleSearchTrigger);
                 input.removeEventListener('change', handleSearchTrigger);
                 
-                // Yeni dinleyicileri ekle
                 if (input.tagName === 'INPUT' && input.type === 'text') {
                     input.addEventListener('keydown', handleSearchTrigger);
                 } else if (input.tagName === 'SELECT') {
@@ -612,25 +573,20 @@
 
     // Arama Tetikleyici (Enter veya Select Değişimi)
     function handleSearchTrigger(event) {
-        // Sadece Enter veya Select değişimi ise devam et
         if (event.type === 'keydown' && event.key !== 'Enter') return;
         
-        // Enter ise varsayılan davranışı engelle
         if (event.type === 'keydown') event.preventDefault(); 
 
         const sourceElementId = event.target.id;
         
-        // Inputlardan güncel değerleri al
         const seriNoVal = document.getElementById('barkod_input')?.value.toUpperCase().trim() || 'YOK';
         const stokKodVal = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
         const partiNoVal = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
         const renkVal = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
 
-        // Hangi input tetiklediyse ona göre arama yap
         if (sourceElementId === 'barkod_input') {
             akilliStokAra(seriNoVal, 'YOK', 'YOK', 'YOK', DEPO_KODU);
         } else {
-             // Stok, Parti veya Renk değiştiyse
              akilliStokAra('YOK', stokKodVal, partiNoVal, renkVal, DEPO_KODU);
         }
     }
@@ -678,4 +634,3 @@
 </script>
 </body>
 </html>
-
