@@ -34,6 +34,7 @@ from django.utils.text import slugify
 from PIL import Image
 import pandas as pd
 from PIL import Image, ImageFile
+import xlsxwriter # <-- EK KONTROL: Excel yazmak için gerekli
 
 # --- YÖNTEM 1 (TEŞHİS İÇİN): 'types' import'u devre dışı bırakıldı ---
 # Gemini (Google GenAI) Imports
@@ -117,7 +118,7 @@ def set_personel_session(request):
              if personel_adi not in atananlar:
                  messages.error(request, f"Bu sayım emri sadece {atanan_listesi_raw} kişilerine atanmıştır. Giriş yetkiniz yok.")
                  return redirect('personel_login', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
-        
+             
         return redirect('sayim_giris', sayim_emri_id=sayim_emri_id_int, depo_kodu=depo_kodu)
     return redirect('sayim_emirleri')
 
@@ -293,7 +294,7 @@ class PerformansAnaliziView(DetailView):
                         except Exception as time_err: 
                              print(f"Uyarı: Zaman farkı hesaplama hatası - {t1} vs {t2} - Hata: {time_err}")
                              continue 
-                         
+                          
                     if farklar_sn: 
                         toplam_saniye = sum(farklar_sn)
                         ortalama_sure_sn = toplam_saniye / len(farklar_sn)
@@ -339,8 +340,8 @@ class CanliFarkOzetiView(DetailView):
         sayim_emri = self.object
         try:
             sayilan_toplamlar = SayimDetay.objects.filter(sayim_emri=sayim_emri, benzersiz_malzeme__isnull=False)\
-                 .values('benzersiz_malzeme__benzersiz_id')\
-                 .annotate(toplam_sayilan=Sum('sayilan_stok'))
+                             .values('benzersiz_malzeme__benzersiz_id')\
+                             .annotate(toplam_sayilan=Sum('sayilan_stok'))
 
             sayilan_miktarlar_dict = {
                  item['benzersiz_malzeme__benzersiz_id']: item['toplam_sayilan'] or Decimal('0.0')
@@ -364,8 +365,8 @@ class CanliFarkOzetiView(DetailView):
 
                 if stok_grubu not in grup_ozet:
                     grup_ozet[stok_grubu] = {
-                        'sistem_mik_toplam': Decimal('0.0'), 'sistem_tutar_toplam': Decimal('0.0'),
-                        'sayilan_mik_toplam': Decimal('0.0'), 'tutar_fark_toplam': Decimal('0.0'), 
+                         'sistem_mik_toplam': Decimal('0.0'), 'sistem_tutar_toplam': Decimal('0.0'),
+                         'sayilan_mik_toplam': Decimal('0.0'), 'tutar_fark_toplam': Decimal('0.0'), 
                     }
                 grup_ozet[stok_grubu]['sistem_mik_toplam'] += sistem_mik
                 grup_ozet[stok_grubu]['sistem_tutar_toplam'] += sistem_tutar
@@ -434,7 +435,7 @@ class KonumAnaliziView(DetailView):
                         kayit_tarihi_utc = item['kayit_tarihi']
                         # Veritabanından gelenin 'aware' (UTC) olduğundan emin ol
                         if timezone.is_naive(kayit_tarihi_utc):
-                             kayit_tarihi_utc = timezone.make_aware(kayit_tarihi_utc, timezone.utc)
+                            kayit_tarihi_utc = timezone.make_aware(kayit_tarihi_utc, timezone.utc)
                         
                         kayit_tarihi_local = kayit_tarihi_utc.astimezone(tr_tz) # TR saatine çevir
                         tarih_str = kayit_tarihi_local.strftime("%Y-%m-%d %H:%M:%S")
@@ -442,7 +443,7 @@ class KonumAnaliziView(DetailView):
                         print(f"Tarih çevirme hatası: {e}")
                         tarih_str = item['kayit_tarihi'].strftime("%Y-%m-%d %H:%M:%S") # Hata olursa eskisi gibi göster
                 # --- *** REVİZE BİTTİ *** ---
-                     
+                      
                 markers.append({
                     'personel': item['personel_adi'], 'lat': lat, 'lng': lng,
                     'tarih': tarih_str, # Çevrilmiş saati kullan
@@ -481,8 +482,8 @@ def stoklari_onayla_ve_kapat(request, sayim_emri_id):
     try:
         now = timezone.now()
         sayilan_toplamlar = SayimDetay.objects.filter(sayim_emri=sayim_emri, benzersiz_malzeme__isnull=False)\
-             .values('benzersiz_malzeme__benzersiz_id')\
-             .annotate(toplam_sayilan=Sum('sayilan_stok'))
+                             .values('benzersiz_malzeme__benzersiz_id')\
+                             .annotate(toplam_sayilan=Sum('sayilan_stok'))
         guncellenecek_stoklar = { i['benzersiz_malzeme__benzersiz_id']: i['toplam_sayilan'] or Decimal('0.0') for i in sayilan_toplamlar }
         guncellenecek_ids = list(guncellenecek_stoklar.keys())
         updated_count, skipped_count = 0, 0
@@ -587,7 +588,7 @@ def upload_and_reload_stok_data(request):
                      msg = f'Satır {rn}: Veri hatası - "{conv_err}". Miktar="{m}", Maliyet="{c}".'
                      print(msg); return JsonResponse({'success': False, 'message': msg}, status=400)
             if not processed_rows: return JsonResponse({'success': False, 'message': 'Geçerli veri yok.'}, status=400)
-                 
+                    
             created_count, updated_count, fail_count = 0, 0, 0
             with transaction.atomic():
                 
@@ -646,25 +647,25 @@ def ajax_akilli_stok_ara(request):
             Q(benzersiz_id=seri_no) | Q(malzeme_kodu__iexact=seri_no) | Q(seri_no__iexact=seri_no), 
             lokasyon_kodu__iexact=depo_kod
         ).first()
-        print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
+        print(f"    -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
 
     if not malzeme and parti_no != 'YOK':
         print(f">> 2: Parti ({parti_no}), Stok ({stok_kod})")
         q = {'parti_no__iexact': parti_no, 'lokasyon_kodu__iexact': depo_kod}
         if stok_kod != 'YOK': q['malzeme_kodu__iexact'] = stok_kod
         malzeme = Malzeme.objects.filter(**q).first() 
-        print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
+        print(f"    -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
 
     if not malzeme and stok_kod != 'YOK' and parti_no != 'YOK' and renk != 'YOK':
         print(f">> 3: Stok ({stok_kod}), Parti ({parti_no}), Renk ({renk})")
         malzeme = Malzeme.objects.filter(malzeme_kodu__iexact=stok_kod, parti_no__iexact=parti_no, renk__iexact=renk, lokasyon_kodu__iexact=depo_kod).first()
-        print(f"   -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
+        print(f"    -> {'Bulundu: '+malzeme.benzersiz_id if malzeme else 'Bulunamadı'}")
 
     if not malzeme and stok_kod != 'YOK':
         print(f">> 4: Stok ({stok_kod}) Varyantları")
         varyantlar = Malzeme.objects.filter(malzeme_kodu__iexact=stok_kod, lokasyon_kodu__iexact=depo_kod)
         vc = varyantlar.count()
-        print(f"   -> {vc} varyant bulundu.")
+        print(f"    -> {vc} varyant bulundu.")
         if vc == 1: malzeme = varyantlar.first(); print(f"      -> Tek varyant seçildi: {malzeme.benzersiz_id}")
         elif vc > 1:
             response_data.update({'urun_bilgi': f"Varyant Seç ({stok_kod} - {vc} adet)", 'stok_kod': stok_kod})
@@ -683,10 +684,10 @@ def ajax_akilli_stok_ara(request):
             try: 
                 ts = SayimDetay.objects.filter(sayim_emri_id=int(seid_str), benzersiz_malzeme=malzeme).aggregate(t=Sum('sayilan_stok'))['t'] or Decimal('0.0')
             except: pass 
-        print(f"   -> Bu sayım toplamı: {ts:.2f}")
+        print(f"    -> Bu sayım toplamı: {ts:.2f}")
         dd = Malzeme.objects.filter(malzeme_kodu__iexact=malzeme.malzeme_kodu).exclude(lokasyon_kodu__iexact=malzeme.lokasyon_kodu).values_list('lokasyon_kodu', flat=True).distinct()
         fdu = f"⚠️ Başka depolarda: {', '.join(sorted([standardize_id_part(d) for d in dd]))}" if dd.exists() else ""
-        if fdu: print(f"   -> Farklı depo uyarısı var.")
+        if fdu: print(f"    -> Farklı depo uyarısı var.")
         
         response_data.update({
             'found': True, 'benzersiz_id': malzeme.benzersiz_id, 
@@ -746,10 +747,10 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
                 sayim_emri=se, benzersiz_malzeme=malzeme, personel_adi=pa, 
                 sayilan_stok=m, latitude=lat, longitude=lon
             )
-            print("   -> Oluşturuldu.")
+            print("    -> Oluşturuldu.")
             
             ts = SayimDetay.objects.filter(sayim_emri=se, benzersiz_malzeme=malzeme).aggregate(t=Sum('sayilan_stok'))['t'] or Decimal('0.0')
-            print(f"   -> Yeni Toplam: {ts}")
+            print(f"    -> Yeni Toplam: {ts}")
             print(f"--- KAYIT BİTTİ (Başarılı) ---")
             
             return JsonResponse({'success': True, 'message': f"✅ {malzeme.malzeme_kodu} ({malzeme.parti_no}) {m:.2f} kayıt.", 'yeni_miktar': f"{ts:.2f}" })
@@ -797,26 +798,9 @@ def gemini_ocr_analiz(request):
         prompt = ("Analyze labels, create JSON list with 'stok_kod', 'parti_no', 'renk', 'miktar'. Quantity as decimal.")
         
         # --- TEŞHİS İÇİN GenerationConfig GEÇİCİ OLARAK KALDIRILDI ---
-        # generation_config = GenerationConfig(
-        #     response_mime_type="application/json", 
-        #     response_schema=Schema( # Bu satır hata veriyordu
-        #         type=Type.ARRAY, 
-        #         items=Schema(
-        #             type=Type.OBJECT, 
-        #             properties={
-        #                 'stok_kod': Schema(type=Type.STRING), 
-        #                 'parti_no': Schema(type=Type.STRING), 
-        #                 'renk': Schema(type=Type.STRING), 
-        #                 'miktar': Schema(type=Type.NUMBER)
-        #             }, 
-        #             required=['stok_kod']
-        #         )
-        #     )
-        # )
-        
-        print(f"Gemini API Çağrısı: Model={model_name}")
         # response = model.generate_content([prompt, img], generation_config=generation_config) # Config olmadan çağır
         response = model.generate_content([prompt, img]) # Config olmadan çağırıyoruz
+        print(f"Gemini API Çağrısı: Model={model_name}")
         print("Gemini Yanıtı Alındı.")
         
         # Yanıt JSON formatında olmayabilir, manuel parse etmeyi deneyelim
@@ -854,7 +838,7 @@ def gemini_ocr_analiz(request):
         print("OCR Sonuçları İşleniyor...")
         for i, item in enumerate(json_results):
              if not isinstance(item, dict): 
-                 print(f"   -> {i+1} atlandı (dict değil)."); continue 
+                 print(f"    -> {i+1} atlandı (dict değil)."); continue 
              try:
                  mr = item.get('miktar', '0.0'); md = Decimal('0.0')
                  if isinstance(mr, (int, float)): md = Decimal(mr)
@@ -862,11 +846,11 @@ def gemini_ocr_analiz(request):
                  # Eğer miktar hala 0 ise, 1 yapalım (OCR'da genelde 1 adet olur)
                  if md <= Decimal('0.0'): md = Decimal('1.0')
              except: 
-                 print(f"   -> {i+1}: Miktar ('{mr}') geçersiz, 1.0 kullanıldı."); md = Decimal('1.0') 
+                 print(f"    -> {i+1}: Miktar ('{mr}') geçersiz, 1.0 kullanıldı."); md = Decimal('1.0') 
                  
              sk = standardize_id_part(item.get('stok_kod', 'YOK'))
              if sk == 'YOK': 
-                 print(f"   -> {i+1} atlandı (Stok Kodu YOK)."); continue 
+                 print(f"    -> {i+1} atlandı (Stok Kodu YOK)."); continue 
                  
              processed.append({
                  'stok_kod': sk, 
@@ -875,7 +859,7 @@ def gemini_ocr_analiz(request):
                  'miktar': f"{md:.2f}", 
                  'barkod': sk 
              })
-             print(f"   -> {i+1} işlendi: Stok={sk}, Miktar={md:.2f}")
+             print(f"    -> {i+1} işlendi: Stok={sk}, Miktar={md:.2f}")
 
         c = len(processed)
         if c == 0: 
@@ -907,8 +891,95 @@ def gemini_ocr_analiz(request):
         return JsonResponse({'success': False, 'message': f"Görsel analizi sırasında beklenmedik sunucu hatası ({error_type})."}, status=500)
 
 
-# --- EXCEL EXPORT --- (Placeholderlar)
+# --- EXCEL EXPORT --- (Mutabakat Excel artık çalışır durumda!)
 @csrf_exempt
-def export_excel(request, sayim_emri_id): se = get_object_or_404(SayimEmri, pk=sayim_emri_id); return HttpResponse(f"'{se.ad}' Excel Raporu Henüz Yok.", status=501)
+def export_excel(request, sayim_emri_id): 
+    # Bu, temel rapor için placeholder olarak kalabilir, Mutabakat Excel'i tamamladık.
+    se = get_object_or_404(SayimEmri, pk=sayim_emri_id); 
+    return HttpResponse(f"'{se.ad}' Excel Raporu Henüz Yok.", status=501)
+
 @csrf_exempt
-def export_mutabakat_excel(request, sayim_emri_id): se = get_object_or_404(SayimEmri, pk=sayim_emri_id); return HttpResponse(f"'{se.ad}' Mutabakat Excel Henüz Yok.", status=501)
+def export_mutabakat_excel(request, sayim_emri_id):
+    """
+    Sayım emrine ait detaylı mutabakat raporunu (Sistem vs. Sayılan) Excel olarak dışa aktarır.
+    """
+    sayim_emri = get_object_or_404(SayimEmri, pk=sayim_emri_id)
+    
+    try:
+        # 1. Sayım Detaylarını ve Malzeme verilerini çekme ve hesaplama (RaporlamaView mantığı)
+        sayim_detaylari = SayimDetay.objects.filter(sayim_emri=sayim_emri).select_related('benzersiz_malzeme')
+        # Sadece sayım emriyle ilişkili malzemeleri alarak performansı artırabiliriz
+        benzersiz_malzeme_ids = sayim_detaylari.values_list('benzersiz_malzeme__benzersiz_id', flat=True).distinct()
+        tum_malzemeler = Malzeme.objects.filter(benzersiz_id__in=benzersiz_malzeme_ids)
+        
+        # Ek olarak, hiç sayılmamış ancak sistemde olanları da eklemek için:
+        # Bu kısım RaporlamaView'daki gibi tüm malzemeleri çekmeyi gerektirir. Basitlik için tümünü alalım:
+        tum_malzemeler = Malzeme.objects.all().prefetch_related('sayimdetay_set')
+
+        sayilan_miktarlar = {}
+        for detay in sayim_detaylari:
+            if detay.benzersiz_malzeme:
+                malzeme_id = detay.benzersiz_malzeme.benzersiz_id
+                sayilan_stok = detay.sayilan_stok if isinstance(detay.sayilan_stok, Decimal) else Decimal(str(detay.sayilan_stok or '0.0'))
+                sayilan_miktarlar[malzeme_id] = sayilan_miktarlar.get(malzeme_id, Decimal('0.0')) + sayilan_stok
+
+        rapor_data = []
+        for malzeme in tum_malzemeler:
+            malzeme_id = malzeme.benzersiz_id
+            sayilan_mik_dec = sayilan_miktarlar.get(malzeme_id, Decimal('0.0'))
+            sistem_mik_dec = malzeme.sistem_stogu if isinstance(malzeme.sistem_stogu, Decimal) else Decimal(str(malzeme.sistem_stogu or '0.0'))
+            birim_fiyat_dec = malzeme.birim_fiyat if isinstance(malzeme.birim_fiyat, Decimal) else Decimal(str(malzeme.birim_fiyat or '0.0'))
+            
+            mik_fark_dec = sayilan_mik_dec - sistem_mik_dec
+            tutar_fark_dec = mik_fark_dec * birim_fiyat_dec
+            sistem_tutar_dec = sistem_mik_dec * birim_fiyat_dec
+            
+            # Excel'e aktarılacak sütunlar
+            rapor_data.append({
+                'Stok Kodu': malzeme.malzeme_kodu,
+                'Stok Adı': malzeme.malzeme_adi,
+                'Parti No': malzeme.parti_no,
+                'Renk': malzeme.renk,
+                'Depo Kodu': malzeme.lokasyon_kodu,
+                'Sistem Miktar': sistem_mik_dec,
+                'Sayım Miktar': sayilan_mik_dec,
+                'Miktar Fark': mik_fark_dec,
+                'Birim Fiyat': birim_fiyat_dec,
+                'Sistem Tutar': sistem_tutar_dec,
+                'Tutar Fark': tutar_fark_dec,
+                'Birim': malzeme.olcu_birimi
+            })
+
+        # 2. Pandas DataFrame oluştur
+        df = pd.DataFrame(rapor_data)
+        
+        # 3. HTTP Yanıtı oluştur
+        output = IO_Bytes() # Dosya içeriğini bellekte tutmak için
+        # XlsxWriter motorunu kullanarak yazma işlemi
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        
+        # Sayfa adını temizle ve kısalt
+        sheet_name = slugify(sayim_emri.ad)[:30].replace('-', '_').upper() or 'MUTABAKAT'
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+        writer.close() # close() çağrısı ile içeriği yazar
+
+        # Yanıtı hazırla
+        output.seek(0)
+        file_name = f"Mutabakat_Raporu_{slugify(sayim_emri.ad)}.xlsx"
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        
+        return response
+
+    except Exception as e:
+        error_type = type(e).__name__
+        print(f"Mutabakat Excel Dışa Aktarma Hatası ({error_type}): {e}")
+        # Hata durumunda kullanıcıya bilgilendirici bir mesaj döndür
+        return HttpResponse(
+            f"Excel oluşturulurken kritik hata oluştu: {e}", 
+            status=500
+        )

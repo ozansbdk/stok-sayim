@@ -1,4 +1,4 @@
-# Temel Django ve Web Sunucusu
+# --- TEMEL DJANGO VE SUNUCU ---
 Django==5.2.7
 gunicorn
 whitenoise==6.11.0
@@ -6,50 +6,44 @@ dj-database-url==3.0.1
 asgiref==3.10.0
 sqlparse==0.5.3
 
-# Veri İşleme ve Yardımcılar
+# --- VERİ İŞLEME VE EXCEL ---
 pandas==2.2.3
-numpy==2.3.3 # pandas için gerekli
-openpyxl==3.1.5 # Yeni .xlsx dosyaları için
-et_xmlfile==2.0.0 # openpyxl için gerekli
+numpy==2.3.3
+openpyxl==3.1.5       # Yeni .xlsx dosyaları okuma/yazma
+xlsxwriter==3.2.0     # <-- EKLENDİ: pd.ExcelWriter motoru için GEREKLİ
+xlrd==2.0.1           # Eski .xls dosyalarını okumak için (Opsiyonel ama iyi olur)
+et_xmlfile==2.0.0
 python-dateutil==2.9.0.post0
 pytz==2025.2
-tzdata==2025.2 # pytz için gerekli
+tzdata==2025.2
 
-# Resim İşleme (OCR ve Diğerleri)
+# --- RESİM İŞLEME ve OCR ---
 Pillow==10.4.0
-pyzbar==0.1.9 # Barkod okuma için (varsa)
-# pytesseract==0.3.13 # Tesseract OCR kullanıyorsanız ekleyin, Gemini varken gereksiz olabilir
+pyzbar==0.1.9
 
-# Google Gemini (OCR için)
+# --- GOOGLE GEMINI (AI) ---
 google-generativeai
-google-api-core>=1.31.5 # Gemini'nin bağımlılığı, pip otomatik halleder ama eklemek iyi olabilir
-google-auth>=2.15.0 # Gemini'nin bağımlılığı
-googleapis-common-protos>=1.56.0 # Gemini'nin bağımlılığı
-proto-plus>=1.22.0 # Gemini'nin bağımlılığı
-protobuf>=3.19.0 # Gemini'nin bağımlılığı
+google-api-core>=1.31.5
+google-auth>=2.15.0
+googleapis-common-protos>=1.56.0
+proto-plus>=1.22.0
+protobuf>=3.19.0
 
-# İstekler ve Ağ
+# --- İSTEKLER VE AĞ (Çoğu bağımlılık) ---
 requests==2.32.5
-aiohttp==3.13.0 # Llama'dan kalmış olabilir, async kullanmıyorsanız kaldırılabilir
-aiohappyeyeballs==2.6.1 # aiohttp bağımlılığı
-aiosignal==1.4.0 # aiohttp bağımlılığı
-attrs==25.4.0 # aiohttp bağımlılığı
-frozenlist==1.8.0 # aiohttp bağımlılığı
-multidict==6.7.0 # aiohttp bağımlılığı
-yarl==1.22.0 # aiohttp bağımlılığı
-charset-normalizer==3.4.3 # requests bağımlılığı
-idna==3.10 # requests bağımlılığı
-urllib3==2.5.0 # requests bağımlılığı
-certifi==2025.10.5 # requests bağımlılığı
+aiohttp==3.13.0
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+attrs==25.4.0
+frozenlist==1.8.0
+multidict==6.7.0
+yarl==1.22.0
+charset-normalizer==3.4.3
+idna==3.10
+urllib3==2.5.0
+certifi==2025.10.5
 
-# Diğerleri (Emin değilseniz kalsın)
-click==8.3.0 # Genellikle komut satırı araçları için
-colorama==0.4.6 # Renkli terminal çıktıları için
-python-dotenv==1.1.1 # .env dosyalarını okumak için (Render Environment kullanıldığı için gereksiz olabilir)
-
-# --- KALDIRILANLAR ---
-# LlamaIndex ve ilişkili AI paketleri (Çakışma yaratıyordu)
-# Streamlit, Altair, Matplotlib, Seaborn, Plotly, Pydeck (Web arayüzünde kullanılmıyorsa gereksiz)
-# Scikit-learn, NLTK (Makine öğrenmesi/NLP kullanılmıyorsa gereksiz)
-# SQLAlchemy, Greenlet (Django ORM varken gereksiz)
-# Banks, Griffe, etc. (Ne işe yaradığı belirsiz veya gereksiz görünenler)
+# --- DİĞERLERİ ---
+click==8.3.0
+colorama==0.4.6
+python-dotenv==1.1.1
