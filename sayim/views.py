@@ -160,7 +160,7 @@ def personel_login(request):
     """
     Personel giriş ekranı. Kullanıcının Sayım Emri ve Depo Kodu seçmesini sağlar.
     """
-    # MODEL ALANI DÜZELTİLDİ: Malzeme.objects.values_list('lokasyon_kodu')
+    # MODEL ALANI DÜZELTİLDİ: lokasyon_kodu
     sayim_emirleri = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
     depo_kodlari = Malzeme.objects.values_list('lokasyon_kodu', flat=True).distinct().order_by('lokasyon_kodu')
     
@@ -194,6 +194,31 @@ def set_personel_session(request):
     
     # Başarılı girişten sonra sayım girişine yönlendir
     return redirect('sayim_giris', sayim_emri_id=sayim_emri_id)
+
+
+# --- YÖNETİM ARAÇLARI (Veri Yükleme için Geri Getirildi) ---
+
+@login_required
+def yonetim_araclari(request): 
+    """Yönetim araçları ana sayfası (Sadece linkleri gösteren placeholder)."""
+    return render(request, 'sayim/yonetim_araclari.html', {})
+
+@require_POST
+@login_required
+@transaction.atomic 
+def upload_and_reload_stok_data(request):
+    """
+    Malzeme yükleme fonksiyonunun placeholder'ı. 
+    Not: Bu fonksiyonun gerçek içeriği kodunuzun önceki versiyonlarında vardı.
+    Şu an için sadece başarı mesajı döndüren yer tutucu bırakalım.
+    """
+    # *** Buraya sizin asıl veri yükleme mantığınız gelmelidir. ***
+    
+    # Basit bir POST işlemi yer tutucusunu koruyoruz (Hata vermez)
+    if 'excel_file' in request.FILES:
+        return JsonResponse({'success': True, 'message': '✅ Excel dosyası alındı. Gerçek yükleme mantığı eklenmeli.'})
+        
+    return JsonResponse({'success': False, 'message': 'Dosya bulunamadı.'}, status=400)
 
 
 # --- AJAX FONKSİYONLARI ---
@@ -236,18 +261,18 @@ def ajax_akilli_stok_ara(request):
     if malzeme:
         data['found'] = True
         data['urun_bilgi'] = f"{malzeme.malzeme_adi} ({malzeme.stok_kod})"
-        data['benzersiz_id'] = generate_unique_id(malzeme.stok_kod, malzeme.parti_no, malzeme.lokasyon_kodu, malzeme.renk) # <<< Düzeltildi
+        data['benzersiz_id'] = generate_unique_id(malzeme.stok_kod, malzeme.parti_no, malzeme.lokasyon_kodu, malzeme.renk) 
         data['sistem_stok'] = f"{malzeme.sistem_stok:.2f}"
         
         sayilan_miktar = SayimDetay.objects.filter(sayim_emri=sayim_emri, malzeme=malzeme).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
         data['sayilan_stok'] = f"{sayilan_miktar:.2f}"
 
-        if malzeme.lokasyon_kodu != depo_kod: # <<< Düzeltildi
+        if malzeme.lokasyon_kodu != depo_kod: 
             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.lokasyon_kodu}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
         # Varyant Arama Mantığı
-        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
+        varyant_malzemeleri = Malzeme.objects.filter(stok_kod=stok_kod_param, lokasyon_kodu=depo_kod) 
         parti_varyantlar = set(v.parti_no for v in varyant_malzemeleri if v.parti_no != 'YOK')
         renk_varyantlar = set(v.renk for v in varyant_malzemeleri if v.renk != 'YOK')
         
@@ -377,7 +402,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
             
             rapor_data.append({
                 'Stok Kodu': malzeme.stok_kod, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, 
-                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, # <<< Düzeltildi
+                'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, 
                 'Sistem Miktar': sistem_mik_dec, 'Sayım Miktar': sayilan_mik_dec, 'Miktar Fark': mik_fark_dec, 
                 'Birim Fiyat': birim_fiyat_dec, 'Sistem Tutar': sistem_tutar_dec, 'Tutar Fark': tutar_fark_dec, 
                 'Birim': malzeme.olcu_birimi

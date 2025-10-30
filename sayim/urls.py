@@ -18,10 +18,14 @@ from .views import (
     export_mutabakat_excel,
     set_personel_session, 
     
-    # 4. AUTH ve DİĞER FONKSİYONLAR (Views.py'da tanımlı olanlar)
-    personel_login,  # <<< PARAMETRESİZ URL'e karşılık gelecek fonksiyon
+    # 4. AUTH ve DİĞER FONKSİYONLAR
+    personel_login,  # <<< PARAMETRESİZ /login/ adresine karşılık gelir
     yeni_sayim_emri, 
     depo_secim,
+    
+    # Yönetim araçları (Veri yükleme için geri getirildi)
+    yonetim_araclari,
+    upload_and_reload_stok_data,
 )
 
 
@@ -39,8 +43,8 @@ urlpatterns = [
     # ----------------------------------------
     # 2. AUTH VE YÖNLENDİRME (KRİTİK DÜZELTME)
     # ----------------------------------------
-    # settings.LOGIN_URL = '/login/' tanımıyla eşleşmeli. PARAMETRESİZ olmalı.
-    path('login/', personel_login, name='personel_login'), # <<< Düzeltilen Satır
+    # settings.LOGIN_URL ile eşleşen PARAMETRESİZ tanım (404 sorununu çözer).
+    path('login/', personel_login, name='personel_login'), 
     
     path('set-session/', set_personel_session, name='set_personel_session'),
     path('depo-secim/', depo_secim, name='depo_secim'),
@@ -53,7 +57,11 @@ urlpatterns = [
     path('ajax/gemini-ocr/', gemini_ocr_analiz, name='ajax_gemini_ocr'), 
 
     # ----------------------------------------
-    # 4. RAPORLAMA
+    # 4. YÖNETİM VE RAPORLAMA
     # ----------------------------------------
     path('export/mutabakat/<uuid:sayim_emri_id>/', export_mutabakat_excel, name='export_mutabakat_excel'),
+    
+    # Yönetim araçları (Veri yükleme için)
+    path('admin-tools/', yonetim_araclari, name='yonetim_araclari'),
+    path('admin-tools/upload-stok/', upload_and_reload_stok_data, name='upload_stok_data'),
 ]
