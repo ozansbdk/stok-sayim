@@ -19,7 +19,7 @@
         <h2 style="color: #6c757d; font-size: 1.2em;">Emir: {{ sayim_emri.ad }} (ID: {{ sayim_emri.pk }})</h2>
 
         <p style="margin-top: 20px;">
-            <a href="{% url 'raporlama_onay' pk=sayim_emri.pk %}">← Mutabakat Raporuna Geri Dön</a>
+            <a href="{% url 'raporlama_onay' sayim_emri_id=sayim_emri.pk %}">Rapora Geri Dön</a>
         </p>
         <p>Toplam Konum Verisi: <strong>{{ toplam_kayit }}</strong> kayıt | Konum Alınamayan Kayıt: {{ konum_almayan_kayitlar }}</p>
 
