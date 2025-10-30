@@ -23,9 +23,6 @@ DEBUG = True
 # Yerel ortamlar için izin verilen hostlar.
 ALLOWED_HOSTS = ['stok-sayim.onrender.com', '127.0.0.1']
 
-# RENDER ile ilgili tüm ortam değişkeni okuma ve host ekleme satırları SİLİNDİ.
-
-
 # ----------------------------------------------------------------------
 # 2. UYGULAMA TANIMLARI
 # ----------------------------------------------------------------------
@@ -75,7 +72,6 @@ WSGI_APPLICATION = 'stock_project.wsgi.application'
 # ----------------------------------------------------------------------
 # 3. VERİTABANI AYARLARI (SADECE YEREL SQLite)
 # ----------------------------------------------------------------------
-# Bu kısım, önceki hatayı veren tüm karmaşık mantıktan arındırılmıştır.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -140,3 +136,12 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 # ----------------------------------------------------------------------
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ----------------------------------------------------------------------
+# 8. YÖNLENDİRME AYARLARI (RENDER DÜZELTMESİ)
+# ----------------------------------------------------------------------
+
+# Kullanıcılar giriş yapması gerektiğinde bu URL'ye yönlendirilir.
+# Bu, /accounts/login/ 404 hatasını çözmek için gereklidir.
+LOGIN_URL = '/login/'
