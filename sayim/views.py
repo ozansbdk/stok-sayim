@@ -24,8 +24,9 @@ import xlsxwriter
 from io import BytesIO as IO_Bytes 
 
 
-# Varsayılan modelleri içe aktar
+# Varsayılan modelleri ve yeni formu içe aktar
 from .models import SayimEmri, SayimDetay, Malzeme 
+from .forms import SayimEmriForm # <<< YENİ FORMU İÇE AKTARDIK
 
 # --- YARDIMCI FONKSİYONLAR (CORE MANTIK) ---
 
@@ -51,7 +52,7 @@ def get_malzeme_from_unique_id(unique_id):
             try:
                 # MODEL ALANI: lokasyon_kodu
                 return Malzeme.objects.get(
-                    stok_kod=stok_kod, parti_no=parti_no, lokasyon_kodu=depo_kod_alias, renk=renk
+                    malzeme_kodu=stok_kod, parti_no=parti_no, lokasyon_kodu=depo_kod_alias, renk=renk
                 )
             except Malzeme.DoesNotExist:
                 return None
@@ -77,13 +78,13 @@ def create_or_update_malzeme(data):
     malzeme, created = Malzeme.objects.update_or_create(
         benzersiz_id=unique_id,
         defaults={
-            'malzeme_kodu': stok_kod, # Düzeltildi: malzeme_kodu
+            'malzeme_kodu': stok_kod, 
             'malzeme_adi': data.get('malzeme_adi', f"Yeni Stok: {stok_kod}"),
             'lokasyon_kodu': depo_kod, 
             'parti_no': parti_no,
             'renk': renk,
             'olcu_birimi': data.get('olcu_birimi', 'ADET'),
-            'sistem_stogu': Decimal('0.00'), # Düzeltildi: sistem_stogu
+            'sistem_stogu': Decimal('0.00'), 
             'aktif': True,
         }
     )
@@ -96,7 +97,7 @@ def create_or_update_malzeme(data):
 @login_required
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
-    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
+    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih') 
     return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
 @login_required
@@ -153,9 +154,9 @@ def raporlama_onay(request, sayim_emri_id):
     return render(request, 'sayim/raporlama_onay.html', context)
 
 
-# --- AUTH ve YÖNLENDİRME FONKSİYONLARI (Login Döngüsü Çözüldü) ---
+# --- AUTH ve YÖNLENDİRME FONKSİYONLARI ---
 
-# Bu view'lar artık @login_required DEĞİLDİR
+# Login View: Parametresiz URL'ye karşılık gelir
 def personel_login(request): 
     """
     Personel giriş ekranı. Kullanıcının Sayım Emri ve Depo Kodu seçmesini sağlar.
@@ -170,11 +171,25 @@ def personel_login(request):
     
     return render(request, 'sayim/personel_login.html', context)
 
-# Bu view artık @login_required DEĞİLDİR
+# Yeni Sayım Emri View: Form işlemesi ve kaydı
+@transaction.atomic
 def yeni_sayim_emri(request):
-    """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
-    # NOT: Gerçek Sayım Emri oluşturma formu POST mantığı bu fonksiyona eklenmelidir.
-    return render(request, 'sayim/yeni_sayim_emri.html', {})
+    """Yeni sayım emri oluşturur ve Sayım Emri Listesine yönlendirir."""
+    if request.method == 'POST':
+        form = SayimEmriForm(request.POST) # Formu al
+        if form.is_valid():
+            yeni_emir = form.save(commit=False)
+            yeni_emir.durum = 'BASLADI' 
+            yeni_emir.tarih = timezone.now() 
+            yeni_emir.save()
+            
+            # Başarılı kayıttan sonra Sayım Emri Listesi'ne yönlendir
+            return redirect('sayim_emri_listesi') 
+        # Form geçerli değilse, hatalı formu tekrar göster (aşağıdaki return ile)
+    else:
+        form = SayimEmriForm() # Boş formu göster
+    
+    return render(request, 'sayim/yeni_sayim_emri.html', {'form': form})
 
 def depo_secim(request):
     """Depo Seçim Ekranı (Fonksiyonel yer tutucu)."""
@@ -197,7 +212,6 @@ def set_personel_session(request):
 
 # --- YÖNETİM ARAÇLARI (Veri Yükleme için Geri Getirildi) ---
 
-# Bu view artık @login_required DEĞİLDİR (Kilitlenme Çözümü)
 def yonetim_araclari(request): 
     """Yönetim araçları ana sayfası."""
     return render(request, 'sayim/yonetim.html', {}) 
@@ -285,7 +299,7 @@ def upload_and_reload_stok_data(request):
                     else: updated_count += 1
 
                 except Exception as e:
-                    # print(f"Satır {index+2} yükleme hatası: {e}") 
+                    print(f"Satır {index+2} yükleme hatası: {e}")
                     fail_count += 1; continue
             
             # Başarılı dönüş
@@ -465,7 +479,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
         for malzeme in tum_malzemeler:
             malzeme_id = malzeme.benzersiz_id
             sayilan_mik_dec = sayilan_miktarlar.get(malzeme_id, Decimal('0.0'))
-            sistem_mik_dec = malzeme.sistem_stogu or Decimal('0.0') # <<< Düzeltildi
+            sistem_mik_dec = malzeme.sistem_stogu or Decimal('0.0') # Düzeltildi
             birim_fiyat_dec = malzeme.birim_fiyat or Decimal('0.0')
             
             mik_fark_dec = sayilan_mik_dec - sistem_mik_dec
