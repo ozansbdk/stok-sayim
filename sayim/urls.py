@@ -19,11 +19,11 @@ from .views import (
     set_personel_session, 
     
     # 4. AUTH ve DİĞER FONKSİYONLAR
-    personel_login,  # <<< PARAMETRESİZ /login/ adresine karşılık gelir
+    personel_login,  
     yeni_sayim_emri, 
     depo_secim,
     
-    # Yönetim araçları (Veri yükleme için geri getirildi)
+    # Yönetim araçları
     yonetim_araclari,
     upload_and_reload_stok_data,
 )
@@ -35,33 +35,35 @@ urlpatterns = [
     # ----------------------------------------
     path('', sayim_emri_listesi, name='sayim_emirleri'),
     
-    # Sayım Giriş ve Raporlama (UUID formatını korudum)
-    path('giris/<uuid:sayim_emri_id>/', sayim_giris, name='sayim_giris'),
-    path('rapor/<uuid:sayim_emri_id>/', raporlama_onay, name='raporlama_onay'),
+    # Sayım Giriş (ID TİPİ DÜZELTİLDİ: UUID yerine INT)
+    path('giris/<int:sayim_emri_id>/', sayim_giris, name='sayim_giris'),
+    
+    # Raporlama (ID TİPİ DÜZELTİLDİ)
+    path('rapor/<int:sayim_emri_id>/', raporlama_onay, name='raporlama_onay'),
     path('yeni-emir/', yeni_sayim_emri, name='yeni_sayim_emri'), 
     
     # ----------------------------------------
-    # 2. AUTH VE YÖNLENDİRME (KRİTİK DÜZELTME)
+    # 2. AUTH VE YÖNLENDİRME 
     # ----------------------------------------
-    # settings.LOGIN_URL ile eşleşen PARAMETRESİZ tanım (404 sorununu çözer).
+    # Login (Parametresiz)
     path('login/', personel_login, name='personel_login'), 
     
     path('set-session/', set_personel_session, name='set_personel_session'),
     path('depo-secim/', depo_secim, name='depo_secim'),
     
     # ----------------------------------------
-    # 3. AJAX ENDPOINT'LERİ
+    # 3. AJAX ENDPOINT'LERİ (ID TİPİ DÜZELTİLDİ)
     # ----------------------------------------
     path('ajax/akilli-stok-ara/', ajax_akilli_stok_ara, name='ajax_akilli_stok_ara'),
-    path('ajax/sayim-kaydet/<uuid:sayim_emri_id>/', ajax_sayim_kaydet, name='ajax_sayim_kaydet'),
+    path('ajax/sayim-kaydet/<int:sayim_emri_id>/', ajax_sayim_kaydet, name='ajax_sayim_kaydet'),
     path('ajax/gemini-ocr/', gemini_ocr_analiz, name='ajax_gemini_ocr'), 
 
     # ----------------------------------------
-    # 4. YÖNETİM VE RAPORLAMA
+    # 4. YÖNETİM VE RAPORLAMA (ID TİPİ DÜZELTİLDİ)
     # ----------------------------------------
-    path('export/mutabakat/<uuid:sayim_emri_id>/', export_mutabakat_excel, name='export_mutabakat_excel'),
+    path('export/mutabakat/<int:sayim_emri_id>/', export_mutabakat_excel, name='export_mutabakat_excel'),
     
-    # Yönetim araçları (Veri yükleme için)
+    # Yönetim araçları
     path('admin-tools/', yonetim_araclari, name='yonetim_araclari'),
     path('admin-tools/upload-stok/', upload_and_reload_stok_data, name='upload_stok_data'),
 ]
