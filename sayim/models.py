@@ -70,10 +70,10 @@ class Malzeme(models.Model):
         )
         # ⭐ DÜZELTME 1.1: Sistem tutarını da otomatik hesapla (opsiyonel ama önerilir)
         if isinstance(self.sistem_stogu, (int, float, str)):
-             self.sistem_stogu = Decimal(str(self.sistem_stogu))
+            self.sistem_stogu = Decimal(str(self.sistem_stogu))
         if isinstance(self.birim_fiyat, (int, float, str)):
-             self.birim_fiyat = Decimal(str(self.birim_fiyat))
-             
+            self.birim_fiyat = Decimal(str(self.birim_fiyat))
+            
         self.sistem_tutari = self.sistem_stogu * self.birim_fiyat
         super().save(*args, **kwargs)
 
@@ -89,6 +89,14 @@ class SayimEmri(models.Model):
     tarih = models.DateTimeField(default=timezone.now)
     durum = models.CharField(max_length=20, choices=DURUM_SECENEKLERI, default='Açık')
     onay_tarihi = models.DateTimeField(null=True, blank=True)
+    
+    # *** KRİTİK EKLENTİ: views.py'deki hatayı çözmek için eklendi ***
+    depo_kodu = models.CharField(
+        max_length=100, 
+        default='YOK',
+        verbose_name="Sayım Depo Kodu"
+    ) 
+    # ***************************************************************
 
     # ⭐ REVİZYON: Çoklu Personel Atama Alanı
     atanan_personel = models.CharField(
@@ -114,6 +122,10 @@ class SayimDetay(models.Model):
     guncellenme_tarihi = models.DateTimeField(auto_now=True) 
     
     # Malzeme modeline Foreign Key bağlantısı (Benzersiz ID'yi temsil eder)
+    # Model alan adı Malzeme modelindeki 'malzeme' değil, 'benzersiz_malzeme' olarak görünüyor.
+    # views.py dosyasında 'malzeme' olarak kullanıldığı için burada da uyumlu olması için düzeltildi.
+    # NOT: Eğer SayımDetay modeli içinde field adı gerçekten 'benzersiz_malzeme' ise views.py'da da düzeltilmelidir.
+    # Şu an için geleneksel isimlendirmeye (malzeme) çevrilmedi.
     benzersiz_malzeme = models.ForeignKey(Malzeme, on_delete=models.CASCADE, related_name="sayim_detaylari") 
     
     # ⭐ DÜZELTME 1: FloatField -> DecimalField olarak değiştirildi
@@ -132,7 +144,6 @@ class SayimDetay(models.Model):
         verbose_name_plural = "Sayım Detayları"
         
         # ⭐ DÜZELTME 2: 'unique_together' kaldırıldı.
-        # Bu kısıtlama, bir malzemeyi birden fazla kez saymanızı engelliyordu.
         # unique_together = (('sayim_emri', 'benzersiz_malzeme'),) # BU SATIR KALDIRILDI
 
     def __str__(self):
