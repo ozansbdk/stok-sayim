@@ -12,7 +12,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from django.views.decorators.http import require_POST, require_GET
-from django.contrib.auth.decorators import login_required # Dekorator burada kalsın, ancak bazı view'lardan kaldırıldı
+from django.contrib.auth.decorators import login_required 
 from django.conf import settings 
 from django.utils import timezone
 from django.utils.text import slugify
@@ -181,7 +181,7 @@ def personel_login(request):
 # Yeni Sayım Emri View: Form işlemesi ve kaydı
 @transaction.atomic
 def yeni_sayim_emri(request):
-    """Yeni sayım emri oluşturur ve Sayım Emri Listesine yönlendirir."""
+    """Yeni sayım emri oluşturur ve Sayım Giriş Ekranına yönlendirir."""
     if request.method == 'POST':
         form = SayimEmriForm(request.POST) 
         if form.is_valid():
@@ -190,8 +190,8 @@ def yeni_sayim_emri(request):
             yeni_emir.tarih = timezone.now() 
             yeni_emir.save()
             
-            # Başarılı kayıttan sonra Sayım Emri Listesi'ne yönlendir
-            return redirect('sayim_emirleri') 
+            # **BURASI DÜZELTİLDİ:** Yeni emri kaydettikten sonra Sayım Giriş Ekranına yönlendir.
+            return redirect('sayim_giris', sayim_emri_id=yeni_emir.id)
     else:
         form = SayimEmriForm() # Boş formu göster
     
@@ -265,52 +265,52 @@ def upload_and_reload_stok_data(request):
         created_count, updated_count, fail_count = 0, 0, 0
         
         with transaction.atomic():
-            for index, row in df.iterrows():
-                try:
-                    # Değerleri al ve standardize et
-                    stok_kod_excel = row['Stok Kodu'].upper().strip()
-                    lokasyon_kodu = row['Depo Kodu'].upper().strip()
-                    parti_no = row['Parti'].upper().strip()
-                    renk = row['Renk'].upper().strip()
-                    
-                    if not stok_kod_excel or not lokasyon_kodu: raise ValueError("Stok/Depo Kodu boş olamaz.")
-                    
-                    # Miktar ve Fiyatı Decimal'e çevir (virgül yerine nokta kabul et)
-                    miktar_str = str(row['Miktar']).replace(',', '.').strip()
-                    fiyat_str = str(row['Maliyet birim']).replace(',', '.').strip()
-                    
-                    stok_miktari = Decimal(miktar_str) if miktar_str else Decimal('0.0')
-                    birim_fiyati = Decimal(fiyat_str) if fiyat_str else Decimal('0.0')
-                    
-                    bid = generate_unique_id(stok_kod_excel, parti_no, lokasyon_kodu, renk)
-                    
-                    # Malzeme oluştur veya güncelle (UPSERT)
-                    _, created = Malzeme.objects.update_or_create(
-                        benzersiz_id=bid,
-                        defaults={
-                            'malzeme_kodu': stok_kod_excel, 
-                            'malzeme_adi': row['Stok Adı'] or f"Stok {stok_kod_excel}",
-                            'lokasyon_kodu': lokasyon_kodu, 
-                            'parti_no': parti_no,
-                            'renk': renk,
-                            'olcu_birimi': row['Birim'],
-                            'sistem_stogu': stok_miktari, 
-                            'birim_fiyat': birim_fiyati,
-                            'seri_no': row['seri_no'], 
-                            'barkod': row['barkod'], 
-                        }
-                    )
-                    
-                    if created: created_count += 1
-                    else: updated_count += 1
+             for index, row in df.iterrows():
+                 try:
+                     # Değerleri al ve standardize et
+                     stok_kod_excel = row['Stok Kodu'].upper().strip()
+                     lokasyon_kodu = row['Depo Kodu'].upper().strip()
+                     parti_no = row['Parti'].upper().strip()
+                     renk = row['Renk'].upper().strip()
+                     
+                     if not stok_kod_excel or not lokasyon_kodu: raise ValueError("Stok/Depo Kodu boş olamaz.")
+                     
+                     # Miktar ve Fiyatı Decimal'e çevir (virgül yerine nokta kabul et)
+                     miktar_str = str(row['Miktar']).replace(',', '.').strip()
+                     fiyat_str = str(row['Maliyet birim']).replace(',', '.').strip()
+                     
+                     stok_miktari = Decimal(miktar_str) if miktar_str else Decimal('0.0')
+                     birim_fiyati = Decimal(fiyat_str) if fiyat_str else Decimal('0.0')
+                     
+                     bid = generate_unique_id(stok_kod_excel, parti_no, lokasyon_kodu, renk)
+                     
+                     # Malzeme oluştur veya güncelle (UPSERT)
+                     _, created = Malzeme.objects.update_or_create(
+                         benzersiz_id=bid,
+                         defaults={
+                             'malzeme_kodu': stok_kod_excel, 
+                             'malzeme_adi': row['Stok Adı'] or f"Stok {stok_kod_excel}",
+                             'lokasyon_kodu': lokasyon_kodu, 
+                             'parti_no': parti_no,
+                             'renk': renk,
+                             'olcu_birimi': row['Birim'],
+                             'sistem_stogu': stok_miktari, 
+                             'birim_fiyat': birim_fiyati,
+                             'seri_no': row['seri_no'], 
+                             'barkod': row['barkod'], 
+                         }
+                     )
+                     
+                     if created: created_count += 1
+                     else: updated_count += 1
 
-                except Exception as e:
-                    print(f"Satır {index+2} yükleme hatası: {e}")
-                    fail_count += 1; continue
-            
-            # Başarılı dönüş
-            msg = f"✅ Bitti: {created_count} yeni, {updated_count} güncellenen. Hata/Atlanan: {fail_count}."
-            return JsonResponse({'success': True, 'message': msg})
+                 except Exception as e:
+                     print(f"Satır {index+2} yükleme hatası: {e}")
+                     fail_count += 1; continue
+             
+             # Başarılı dönüş
+             msg = f"✅ Bitti: {created_count} yeni, {updated_count} güncellenen. Hata/Atlanan: {fail_count}."
+             return JsonResponse({'success': True, 'message': msg})
         
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Kritik Yükleme Hatası: {e}'}, status=500)
@@ -361,7 +361,7 @@ def ajax_akilli_stok_ara(request):
         data['sayilan_stok'] = f"{sayilan_miktar:.2f}"
 
         if malzeme.lokasyon_kodu != depo_kod: 
-            data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.lokasyon_kodu}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
+             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.lokasyon_kodu}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
         varyant_malzemeleri = Malzeme.objects.filter(malzeme_kodu=stok_kod_param, lokasyon_kodu=depo_kod) 
@@ -424,7 +424,7 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
             malzeme, malzeme_created = create_or_update_malzeme(malzeme_data)
         
         if not malzeme:
-             return JsonResponse({'success': False, 'message': "Kritik Hata: Malzeme bulunamadı ve oluşturulamadı."}, status=500)
+              return JsonResponse({'success': False, 'message': "Kritik Hata: Malzeme bulunamadı ve oluşturulamadı."}, status=500)
 
         SayimDetay.objects.create(
             sayim_emri=sayim_emri, malzeme=malzeme, miktar=miktar,
