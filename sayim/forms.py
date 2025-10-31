@@ -20,11 +20,9 @@ class SayimGirisForm(forms.Form):
 class SayimEmriForm(forms.ModelForm):
     class Meta:
         model = SayimEmri
-        # views.py'da POST edilen ve Sayım Emri modelinizde olması gereken alanlar
-        fields = ['ad', 'depo_kod', 'atanan_personel'] 
-        
-        # NOT: 'durum' ve 'tarih' alanlarını ModelForm'a dahil etmiyoruz.
-        # Bu alanlar views.py'daki form.save(commit=False) sonrası kodda ayarlanacaktır.
+        # KRİTİK DÜZELTME: 'depo_kod' alanı modelde OLMADIĞI için kaldırıldı. 
+        # Şu an sadece 'ad' ve 'atanan_personel' alanları bekleniyor.
+        fields = ['ad', 'atanan_personel'] 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
