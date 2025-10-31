@@ -2,674 +2,674 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <title>Stok Sayım Girişi | {{ sayim_emri.ad }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        /* SADE VE İŞLEVSEL TEMEL STİLLER */
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f4f7f6; }
-        input[type="text"], input[type="number"], button, select { padding: 10px; margin: 5px 0; display: block; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        .info-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; background-color: white; border-radius: 4px; }
-        .message { padding: 10px; margin-top: 10px; border-radius: 4px; text-align: center; }
-        .message.success { color: green; background-color: #e6ffed; border: 1px solid green; }
-        .message.error { color: red; background-color: #ffe6e6; border: 1px solid red; }
-        .message.warning { color: #856404; background-color: #fff3cd; border-color: #ffeeba;}
-        hr { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
-        .flex-container { display: flex; gap: 10px; margin-bottom: 10px; }
-        .flex-container > div { flex: 1; }
-        .section-header { margin-top: 15px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; font-weight: bold; }
-        button { cursor: pointer; background-color: #007bff; color: white; border: none; font-weight: bold; }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
-        
-        /* Ek Durum Stil Tanımları */
-        #urun_bilgi_alani.status-found { border-left: 5px solid green; padding-left: 10px; background-color: #f0fff0; }
-        #urun_bilgi_alani.status-missing { border-left: 5px solid red; padding-left: 10px; background-color: #fff0f0; }
-        #urun_bilgi_alani.status-variants { border-left: 5px solid orange; padding-left: 10px; background-color: #fff8e1; }
-        #urun_bilgi_alani.status-default { border-left: 5px solid #ccc; padding-left: 10px; background-color: #f9f9f9;}
-        
-        /* Toplu Sayım Tablosu Stil Güncellemesi */
-        #sonuc_tablosu { border-collapse: collapse; margin-top: 10px; }
-        #sonuc_tablosu th, #sonuc_tablosu td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-        #sonuc_tablosu th { background-color: #f2f2f2; }
-        #sonuc_tablosu tbody tr:hover { background-color: #e6f7ff; }
-        #sonuc_tablosu button { font-size: 0.8em; padding: 4px 6px; }
+    <meta charset="UTF-8">
+    <title>Stok Sayım Girişi | {{ sayim_emri.ad }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* SADE VE İŞLEVSEL TEMEL STİLLER */
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f4f7f6; }
+        input[type="text"], input[type="number"], button, select { padding: 10px; margin: 5px 0; display: block; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .info-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; background-color: white; border-radius: 4px; }
+        .message { padding: 10px; margin-top: 10px; border-radius: 4px; text-align: center; }
+        .message.success { color: green; background-color: #e6ffed; border: 1px solid green; }
+        .message.error { color: red; background-color: #ffe6e6; border: 1px solid red; }
+        .message.warning { color: #856404; background-color: #fff3cd; border-color: #ffeeba;}
+        hr { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
+        .flex-container { display: flex; gap: 10px; margin-bottom: 10px; }
+        .flex-container > div { flex: 1; }
+        .section-header { margin-top: 15px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; font-weight: bold; }
+        button { cursor: pointer; background-color: #007bff; color: white; border: none; font-weight: bold; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        /* Ek Durum Stil Tanımları */
+        #urun_bilgi_alani.status-found { border-left: 5px solid green; padding-left: 10px; background-color: #f0fff0; }
+        #urun_bilgi_alani.status-missing { border-left: 5px solid red; padding-left: 10px; background-color: #fff0f0; }
+        #urun_bilgi_alani.status-variants { border-left: 5px solid orange; padding-left: 10px; background-color: #fff8e1; }
+        #urun_bilgi_alani.status-default { border-left: 5px solid #ccc; padding-left: 10px; background-color: #f9f9f9;}
+        
+        /* Toplu Sayım Tablosu Stil Güncellemesi */
+        #sonuc_tablosu { border-collapse: collapse; margin-top: 10px; }
+        #sonuc_tablosu th, #sonuc_tablosu td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+        #sonuc_tablosu th { background-color: #f2f2f2; }
+        #sonuc_tablosu tbody tr:hover { background-color: #e6f7ff; }
+        #sonuc_tablosu button { font-size: 0.8em; padding: 4px 6px; }
 
-        /* Uyarı Mesajı Stili */
-        #farkli_depo_uyari_alani { margin-top: 5px; font-size: 0.9em; font-weight: bold; color: #dc3545; }
+        /* Uyarı Mesajı Stili */
+        #farkli_depo_uyari_alani { margin-top: 5px; font-size: 0.9em; font-weight: bold; color: #dc3545; }
 
-    </style>
+    </style>
 </head>
 <body>
-    <div class="info-box">
-        <h3>Sayım Bilgileri</h3>
-        <p>Sayım Emri: <strong>{{ sayim_emri.ad }}</strong> (ID: {{ sayim_emri_id }})</p>
-        <p>Depo Kodu: <strong id="depo_kodu_gizli">{{ depo_kodu }}</strong></p>
-        <p>Personel: <strong id="personel_adi_gizli">{{ personel_adi }}</strong></p>
-        <a href="{% url 'raporlama_onay' sayim_emri_id=sayim_emri_id %}">Raporlama ve Onay Ekranına Git</a>
-    </div>
+    <div class="info-box">
+        <h3>Sayım Bilgileri</h3>
+        <p>Sayım Emri: <strong>{{ sayim_emri.ad }}</strong> (ID: {{ sayim_emri_id }})</p>
+        <p>Depo Kodu: <strong id="depo_kodu_gizli">{{ depo_kodu }}</strong></p>
+        <p>Personel: <strong id="personel_adi_gizli">{{ personel_adi }}</strong></p>
+        <a href="{% url 'raporlama_onay' sayim_emri_id=sayim_emri_id %}">Raporlama ve Onay Ekranına Git</a>
+    </div>
 
-    <h2>1. Stok Arama ve Veri Girişi</h2>
-    
-    <div class="info-box">
-        <h3 class="section-header">A. Seri No / Barkod Girişi</h3>
-        <input type="text" id="barkod_input" placeholder="Seri No/Barkodu buraya girin (ENTER)">
-        <p style="font-size: 0.9em; color: gray;">(Otomatik arama için ENTER tuşunu kullanın.)</p>
-    </div>
+    <h2>1. Stok Arama ve Veri Girişi</h2>
+    
+    <div class="info-box">
+        <h3 class="section-header">A. Seri No / Barkod Girişi</h3>
+        <input type="text" id="barkod_input" placeholder="Seri No/Barkodu buraya girin (ENTER)">
+        <p style="font-size: 0.9em; color: gray;">(Otomatik arama için ENTER tuşunu kullanın.)</p>
+    </div>
 
-    <hr>
-    
-    <h2>1.B. Yapay Zeka (Gemini/OCR) Girişi</h2>
+    <hr>
+    
+    <h2>1.B. Yapay Zeka (Gemini/OCR) Girişi</h2>
 
-    <div class="info-box">
-        <div class="flex-container">
-            <div>
-                <button id="select-file-btn" type="button" {% if not gemini_available %}disabled title="Gemini API anahtarı ayarlanmamış"{% endif %}>📁 Dosyadan Seç</button>
-            </div>
-            <div>
-                <button id="camera-btn" type="button" style="background-color: #ffc107; color: black;" {% if not gemini_available %}disabled title="Gemini API anahtarı ayarlanmamış"{% endif %}>📷 Kamerayı Aç</button>
-            </div>
-        </div>
-        
-        <input type="file" id="image-input" accept="image/*" style="display: none;">
+    <div class="info-box">
+        <div class="flex-container">
+            <div>
+                <button id="select-file-btn" type="button" {% if not gemini_available %}disabled title="Gemini API anahtarı ayarlanmamış"{% endif %}>📁 Dosyadan Seç</button>
+            </div>
+            <div>
+                <button id="camera-btn" type="button" style="background-color: #ffc107; color: black;" {% if not gemini_available %}disabled title="Gemini API anahtarı ayarlanmamış"{% endif %}>📷 Kamerayı Aç</button>
+            </div>
+        </div>
+        
+        <input type="file" id="image-input" accept="image/*" style="display: none;">
 
-        <p style="font-size: 0.9em; color: gray; margin-top: 10px;">(Gemini Vision ile **çoklu etiket** okuma.)</p>
-        {% if not gemini_available %}
-            <p class="message warning" style="margin-top:10px; text-align:left;">⚠️ Gemini özelliği şu anda aktif değil. Lütfen API anahtarını kontrol edin.</p>
-        {% endif %}
-        
-        <p id="gemini_mesaj" class="message" style="display: none;"></p> </div>
-    
-    <div id="toplu_sonuc_alani" style="margin-top: 20px; border: 1px solid #007bff; padding: 15px; border-radius: 4px; display: none;">
-        <h3 class="section-header" style="border-bottom: none;">Okunan Toplu Etiketler (<span id="toplu_sonuc_sayisi">0</span> Adet)</h3>
-        <table id="sonuc_tablosu" style="width: 100%; font-size: 0.9em;">
-            <thead>
-                <tr>
-                    <th style="width: 30%;">Barkod / Kod</th>
-                    <th style="width: 20%; text-align: right;">Miktar</th>
-                    <th style="width: 40%;">Parti/Renk</th>
-                    <th style="width: 10%;">İşlem</th>
-                </tr>
-            </thead>
-            <tbody>
-                </tbody>
-        </table>
-    </div>
+        <p style="font-size: 0.9em; color: gray; margin-top: 10px;">(Gemini Vision ile **çoklu etiket** okuma.)</p>
+        {% if not gemini_available %}
+            <p class="message warning" style="margin-top:10px; text-align:left;">⚠️ Gemini özelliği şu anda aktif değil. Lütfen API anahtarını kontrol edin.</p>
+        {% endif %}
+        
+        <p id="gemini_mesaj" class="message" style="display: none;"></p> </div>
+    
+    <div id="toplu_sonuc_alani" style="margin-top: 20px; border: 1px solid #007bff; padding: 15px; border-radius: 4px; display: none;">
+        <h3 class="section-header" style="border-bottom: none;">Okunan Toplu Etiketler (<span id="toplu_sonuc_sayisi">0</span> Adet)</h3>
+        <table id="sonuc_tablosu" style="width: 100%; font-size: 0.9em;">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Barkod / Kod</th>
+                    <th style="width: 20%; text-align: right;">Miktar</th>
+                    <th style="width: 40%;">Parti/Renk</th>
+                    <th style="width: 10%;">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
 
-    <hr>
-    <h3 class="section-header">Veya Detaylı Giriş</h3>
-    
-    <div id="stok_kod_container">
-        <input type="text" id="stok_kod_input" placeholder="Stok Kodu">
-    </div>
-    <div id="parti_no_container">
-        <input type="text" id="parti_no_input" placeholder="Parti No (Opsiyonel)">
-    </div>
-    <div id="renk_container">
-        <input type="text" id="renk_input" placeholder="Renk/Varyant (Opsiyonel)">
-    </div>
-    <button id="ara-btn">Stok Ara</button>
+    <hr>
+    <h3 class="section-header">Veya Detaylı Giriş</h3>
+    
+    <div id="stok_kod_container">
+        <input type="text" id="stok_kod_input" placeholder="Stok Kodu">
+    </div>
+    <div id="parti_no_container">
+        <input type="text" id="parti_no_input" placeholder="Parti No (Opsiyonel)">
+    </div>
+    <div id="renk_container">
+        <input type="text" id="renk_input" placeholder="Renk/Varyant (Opsiyonel)">
+    </div>
+    <button id="ara-btn">Stok Ara</button>
 
-    <div id="urun_bilgi_alani" style="margin-top: 15px;" class="status-default">
-        <p>Ürün: <strong id="urun_bilgi">Stok kodu veya Barkod girin...</strong></p>
-        <p>Sistem Stoğu: <strong id="sistem_stok_goster">0.00</strong></p>
-        <p>Bu Sayımdaki Toplam: <strong id="sayilan_stok_goster">0.00</strong></p> <p>Son Sayım (Genel): <strong id="last_sayim_goster">Bilinmiyor</strong></p>
-        <p id="farkli_depo_uyari_alani"></p> </div>
+    <div id="urun_bilgi_alani" style="margin-top: 15px;" class="status-default">
+        <p>Ürün: <strong id="urun_bilgi">Stok kodu veya Barkod girin...</strong></p>
+        <p>Sistem Stoğu: <strong id="sistem_stok_goster">0.00</strong></p>
+        <p>Bu Sayımdaki Toplam: <strong id="sayilan_stok_goster">0.00</strong></p> <p>Son Sayım (Genel): <strong id="last_sayim_goster">Bilinmiyor</strong></p>
+        <p id="farkli_depo_uyari_alani"></p> </div>
 
-    <hr>
+    <hr>
 
-    <h2>2. Sayım Girişi</h2>
-    
-    <input type="number" id="miktar_input" placeholder="Sayım Miktarı (Örn: 1.00)" step="0.01"> <button id="sayim_kaydet_btn" style="background-color: #28a745;" disabled>KAYDET (**ENTER**)</button> <p class="message" id="kayit_mesaji" style="display:none;"></p> <script>
-    // **********************************************
-    // GLOBAL DEĞİŞKENLER VE TEMEL FONKSİYONLAR
-    // **********************************************
+    <h2>2. Sayım Girişi</h2>
+    
+    <input type="number" id="miktar_input" placeholder="Sayım Miktarı (Örn: 1.00)" step="0.01"> <button id="sayim_kaydet_btn" style="background-color: #28a745;" disabled>KAYDET (**ENTER**)</button> <p class="message" id="kayit_mesaji" style="display:none;"></p> <script>
+    // **********************************************
+    // GLOBAL DEĞİŞKENLER VE TEMEL FONKSİYONLAR
+    // **********************************************
 
-    let DEPO_KODU = 'YOK';
-    let PERSONEL_ADI = 'MISAFIR';
-    const SAYIM_EMRI_ID = "{{ sayim_emri_id }}"; // View'dan gelen garanti ID
-    
-    const GEMINI_AVAILABLE = {{ gemini_available|yesno:"true,false" }};
-    // Aktif olarak seçili/bulunan ürünün bilgilerini tutar
-    let currentBenzersizId = null; // <-- KESİN ÇÖZÜM İÇİN EKLENDİ
-    let currentStokKod = '';
-    let currentPartiNo = 'YOK';
-    let currentRenk = 'YOK';
-    
-    // DOM Elementleri (Tekrarlı erişimi azaltmak için)
-    let barkodInput, stokKodInput, partiNoContainer, renkContainer, araBtn, miktarInput, kaydetBtn;
-    let urunBilgiAlani, urunBilgi, sistemStokGoster, sayilanStokGoster, lastSayimGoster, farkliDepoUyariAlani, kayitMesaji;
-    let geminiMesaj, topluSonucAlani, topluSonucSayisi, sonucTablosuBody;
-    let imageInput, selectFileBtn, cameraBtn;
+    let DEPO_KODU = 'YOK';
+    let PERSONEL_ADI = 'MISAFIR';
+    const SAYIM_EMRI_ID = "{{ sayim_emri_id }}"; // View'dan gelen garanti ID
+    
+    const GEMINI_AVAILABLE = {{ gemini_available|yesno:"true,false" }};
+    // Aktif olarak seçili/bulunan ürünün bilgilerini tutar
+    let currentBenzersizId = null; // <-- KESİN ÇÖZÜM İÇİN EKLENDİ
+    let currentStokKod = '';
+    let currentPartiNo = 'YOK';
+    let currentRenk = 'YOK';
+    
+    // DOM Elementleri (Tekrarlı erişimi azaltmak için)
+    let barkodInput, stokKodInput, partiNoContainer, renkContainer, araBtn, miktarInput, kaydetBtn;
+    let urunBilgiAlani, urunBilgi, sistemStokGoster, sayilanStokGoster, lastSayimGoster, farkliDepoUyariAlani, kayitMesaji;
+    let geminiMesaj, topluSonucAlani, topluSonucSayisi, sonucTablosuBody;
+    let imageInput, selectFileBtn, cameraBtn;
 
-    // CSRF Token Fonksiyonu
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.startsWith(name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
+    // CSRF Token Fonksiyonu
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 
-    // Mesaj gösterme fonksiyonu
-    function showMessage(elementId, text, type = 'info', autoHideDelay = 5000) {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-        element.innerText = text;
-        element.className = `message ${type}`; // type: success, error, warning, info
-        element.style.display = 'block';
+    // Mesaj gösterme fonksiyonu
+    function showMessage(elementId, text, type = 'info', autoHideDelay = 5000) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        element.innerText = text;
+        element.className = `message ${type}`; // type: success, error, warning, info
+        element.style.display = 'block';
 
-        // Mesajı belirli bir süre sonra gizle (success ve info için)
-        if ((type === 'success' || type === 'info') && autoHideDelay > 0) {
-            setTimeout(() => {
-                element.style.display = 'none';
-            }, autoHideDelay);
-        }
-    }
-    
-    // Arayüzü sıfırlama (Yeni arama öncesi)
-    function resetUIBeforeSearch() {
-        urunBilgi.innerText = 'Aranıyor...';
-        sistemStokGoster.innerText = '0.00';
-        sayilanStokGoster.innerText = '0.00';
-        lastSayimGoster.innerText = 'Bilinmiyor';
-        farkliDepoUyariAlani.innerText = '';
-        kayitMesaji.style.display = 'none';
-        urunBilgiAlani.className = 'status-default'; // Varsayılan stil
-        kaydetBtn.disabled = true; // Kaydet butonunu devre dışı bırak
-        currentBenzersizId = null; // <-- ÖNEMLİ: ID'yi sıfırla
-    }
+        // Mesajı belirli bir süre sonra gizle (success ve info için)
+        if ((type === 'success' || type === 'info') && autoHideDelay > 0) {
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, autoHideDelay);
+        }
+    }
+    
+    // Arayüzü sıfırlama (Yeni arama öncesi)
+    function resetUIBeforeSearch() {
+        urunBilgi.innerText = 'Aranıyor...';
+        sistemStokGoster.innerText = '0.00';
+        sayilanStokGoster.innerText = '0.00';
+        lastSayimGoster.innerText = 'Bilinmiyor';
+        farkliDepoUyariAlani.innerText = '';
+        kayitMesaji.style.display = 'none';
+        urunBilgiAlani.className = 'status-default'; // Varsayılan stil
+        kaydetBtn.disabled = true; // Kaydet butonunu devre dışı bırak
+        currentBenzersizId = null; // <-- ÖNEMLİ: ID'yi sıfırla
+    }
 
-    // Arama sonucu arayüzü güncelleme
-    function updateUIAfterSearch(data) {
-        urunBilgi.innerText = data.urun_bilgi || 'Bilinmeyen Ürün';
-        sistemStokGoster.innerText = data.sistem_stok || '0.00';
-        sayilanStokGoster.innerText = data.sayilan_stok || '0.00'; // Sayılan stoğu göster
-        lastSayimGoster.innerText = (data.last_sayim && data.last_sayim.tarih) ? `${data.last_sayim.tarih} (${data.last_sayim.personel})` : 'Yok';
-        farkliDepoUyariAlani.innerText = data.farkli_depo_uyarisi || '';
+    // Arama sonucu arayüzü güncelleme
+    function updateUIAfterSearch(data) {
+        urunBilgi.innerText = data.urun_bilgi || 'Bilinmeyen Ürün';
+        sistemStokGoster.innerText = data.sistem_stok || '0.00';
+        sayilanStokGoster.innerText = data.sayilan_stok || '0.00'; // Sayılan stoğu göster
+        lastSayimGoster.innerText = (data.last_sayim && data.last_sayim.tarih) ? `${data.last_sayim.tarih} (${data.last_sayim.personel})` : 'Yok';
+        farkliDepoUyariAlani.innerText = data.farkli_depo_uyarisi || '';
 
-        // Global değişkenleri güncelle (Arama sonucu ne olursa olsun)
-        currentStokKod = data.stok_kod || 'YOK';
-        currentPartiNo = data.parti_no || 'YOK';
-        currentRenk = data.renk || 'YOK';
-        currentBenzersizId = data.benzersiz_id || null; // <-- ID'yi güncelle
+        // Global değişkenleri güncelle (Arama sonucu ne olursa olsun)
+        currentStokKod = data.stok_kod || 'YOK';
+        currentPartiNo = data.parti_no || 'YOK';
+        currentRenk = data.renk || 'YOK';
+        currentBenzersizId = data.benzersiz_id || null; // <-- ID'yi güncelle
 
-        if (data.found) {
-            urunBilgiAlani.className = 'status-found';
-            kaydetBtn.disabled = false; // Ürün bulunduysa kaydetmeyi etkinleştir
-            // Stok kodu inputunu doldur (barkodla arandıysa)
-            if (stokKodInput.value !== data.stok_kod) stokKodInput.value = data.stok_kod;
-             // Varyant inputlarını normal inputa çevir (dropdown kalmasın)
-             updateVariantInputs({ parti_no: data.parti_no, renk: data.renk }); 
-             // Miktar alanına odaklan
-             miktarInput.focus(); 
-        } else if (data.parti_varyantlar?.length > 0 || data.renk_varyantlar?.length > 0) {
-            urunBilgiAlani.className = 'status-variants';
-            kaydetBtn.disabled = true; // Varyant seçimi gerekliyse kaydetme pasif
-            updateVariantInputs(data); // Dropdownları oluştur
-        } else {
-            urunBilgiAlani.className = 'status-missing';
-            // Yeni stok girişi (yeni mantık): Stok Kodu varsa ve benzersiz ID'yi manuel oluşturabilirsek kaydetmeyi aktif et.
-            const stokKodManuel = document.getElementById('stok_kod_input')?.value.toUpperCase().trim();
-            if (stokKodManuel && stokKodManuel !== 'YOK') {
-                // Yeni stok için benzersiz ID'yi burada geçici olarak oluştur.
-                // Arka uç, bu ID ile yeni bir Malzeme oluşturacak.
-                const partiNoManuel = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
-                const renkManuel = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
-                
-                // Buradaki mantık, views.py'daki generate_unique_id fonksiyonunu taklit etmelidir.
-                // Biz burada sadece arama kriterlerini Benzersiz ID olarak kullanıp, arka uca bu bilgileri göndererek oluşturmasını isteyeceğiz.
-                
-                // Benzersiz ID oluşturma:
-                // Format: STOKKOD_PARTI_DEPO_RENK (bu sayede yeni bir stok yaratabiliriz)
-                currentBenzersizId = `${stokKodManuel}_${partiNoManuel}_${DEPO_KODU}_${renkManuel}`;
-                currentStokKod = stokKodManuel;
-                currentPartiNo = partiNoManuel;
-                currentRenk = renkManuel;
+        if (data.found) {
+            urunBilgiAlani.className = 'status-found';
+            kaydetBtn.disabled = false; // Ürün bulunduysa kaydetmeyi etkinleştir
+            // Stok kodu inputunu doldur (barkodla arandıysa)
+            if (stokKodInput.value !== data.stok_kod) stokKodInput.value = data.stok_kod;
+             // Varyant inputlarını normal inputa çevir (dropdown kalmasın)
+             updateVariantInputs({ parti_no: data.parti_no, renk: data.renk }); 
+             // Miktar alanına odaklan
+             miktarInput.focus(); 
+        } else if (data.parti_varyantlar?.length > 0 || data.renk_varyantlar?.length > 0) {
+            urunBilgiAlani.className = 'status-variants';
+            kaydetBtn.disabled = true; // Varyant seçimi gerekliyse kaydetme pasif
+            updateVariantInputs(data); // Dropdownları oluştur
+        } else {
+            urunBilgiAlani.className = 'status-missing';
+            // Yeni stok girişi (yeni mantık): Stok Kodu varsa ve benzersiz ID'yi manuel oluşturabilirsek kaydetmeyi aktif et.
+            const stokKodManuel = document.getElementById('stok_kod_input')?.value.toUpperCase().trim();
+            if (stokKodManuel && stokKodManuel !== 'YOK') {
+                // Yeni stok için benzersiz ID'yi burada geçici olarak oluştur.
+                // Arka uç, bu ID ile yeni bir Malzeme oluşturacak.
+                const partiNoManuel = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
+                const renkManuel = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
+                
+                // Buradaki mantık, views.py'daki generate_unique_id fonksiyonunu taklit etmelidir.
+                // Format: STOKKOD_PARTI_DEPO_RENK (bu sayede yeni bir stok yaratabiliriz)
+                currentBenzersizId = `${stokKodManuel}_${partiNoManuel}_${DEPO_KODU}_${renkManuel}`;
+                currentStokKod = stokKodManuel;
+                currentPartiNo = partiNoManuel;
+                currentRenk = renkManuel;
 
-                urunBilgi.innerText = `YENİ STOK OLUŞTURULACAK: ${currentBenzersizId}`;
-                urunBilgiAlani.className = 'status-found'; // Yeşil gibi görünmeli, çünkü kaydedilebilir
-                kaydetBtn.disabled = false; // KAYIT AKTİF
-                miktarInput.focus();
-                
-            } else {
-                 kaydetBtn.disabled = true; // Stok Kodu yoksa kaydetme pasif
-                 updateVariantInputs({ parti_no: data.parti_no || 'YOK', renk: data.renk || 'YOK' }); // Normal input göster
-            }
-        }
-    }
+                urunBilgi.innerText = `YENİ STOK OLUŞTURULACAK: ${currentBenzersizId}`;
+                urunBilgiAlani.className = 'status-found'; // Yeşil gibi görünmeli, çünkü kaydedilebilir
+                kaydetBtn.disabled = false; // KAYIT AKTİF
+                miktarInput.focus();
+                
+            } else {
+                 kaydetBtn.disabled = true; // Stok Kodu yoksa kaydetme pasif
+                 updateVariantInputs({ parti_no: data.parti_no || 'YOK', renk: data.renk || 'YOK' }); // Normal input göster
+            }
+        }
+    }
 
 
-    // **********************************************
-    // 1. VARYANT INPUT/DROPDOWN YÖNETİMİ
-    // **********************************************
-    function updateVariantInputs(data) {
-        // Not: data objesi { parti_no: '..', renk: '..', parti_varyantlar: [...], renk_varyantlar: [...] } içerebilir
-        
-        const createInput = (id, placeholder, value) => 
-            `<input type="text" id="${id}" placeholder="${placeholder}" value="${value && value !== 'YOK' ? value : ''}">`;
+    // **********************************************
+    // 1. VARYANT INPUT/DROPDOWN YÖNETİMİ
+    // **********************************************
+    function updateVariantInputs(data) {
+        // Not: data objesi { parti_no: '..', renk: '..', parti_varyantlar: [...], renk_varyantlar: [...] } içerebilir
+        
+        const createInput = (id, placeholder, value) => 
+            `<input type="text" id="${id}" placeholder="${placeholder}" value="${value && value !== 'YOK' ? value : ''}">`;
 
-        const createSelect = (id, optionsList, selectedValue) => {
-            let optionsHTML = `<option value="YOK" ${!selectedValue || selectedValue === 'YOK' ? 'selected' : ''}>-- Seç --</option>`; // Başlangıç seçeneği
-             optionsHTML += optionsList.map(opt => 
-                `<option value="${opt}" ${selectedValue === opt ? 'selected' : ''}>${opt}</option>`
-             ).join('');
-             return `<select id="${id}">${optionsHTML}</select>`;
-        };
-                 
-        // Parti No
-        const currentPartiValue = document.getElementById('parti_no_input')?.value || data.parti_no;
-        if (data.parti_varyantlar && data.parti_varyantlar.length > 0) {
-            partiNoContainer.innerHTML = createSelect('parti_no_input', data.parti_varyantlar, currentPartiValue);
-        } else {
-            partiNoContainer.innerHTML = createInput('parti_no_input', 'Parti No (Opsiyonel)', currentPartiValue);
-        }
+        const createSelect = (id, optionsList, selectedValue) => {
+            let optionsHTML = `<option value="YOK" ${!selectedValue || selectedValue === 'YOK' ? 'selected' : ''}>-- Seç --</option>`; // Başlangıç seçeneği
+             optionsHTML += optionsList.map(opt => 
+                `<option value="${opt}" ${selectedValue === opt ? 'selected' : ''}>${opt}</option>`
+             ).join('');
+             return `<select id="${id}">${optionsHTML}</select>`;
+        };
+                 
+        // Parti No
+        const currentPartiValue = document.getElementById('parti_no_input')?.value || data.parti_no;
+        if (data.parti_varyantlar && data.parti_varyantlar.length > 0) {
+            partiNoContainer.innerHTML = createSelect('parti_no_input', data.parti_varyantlar, currentPartiValue);
+        } else {
+            partiNoContainer.innerHTML = createInput('parti_no_input', 'Parti No (Opsiyonel)', currentPartiValue);
+        }
 
-        // Renk/Varyant
-        const currentRenkValue = document.getElementById('renk_input')?.value || data.renk;
-        if (data.renk_varyantlar && data.renk_varyantlar.length > 0) {
-            renkContainer.innerHTML = createSelect('renk_input', data.renk_varyantlar, currentRenkValue);
-        } else {
-            renkContainer.innerHTML = createInput('renk_input', 'Renk/Varyant (Opsiyonel)', currentRenkValue);
-        }
-        
-        // Dinamik olarak eklenen input/select için olay dinleyicilerini yeniden kur
-        setupAutoSearchListeners(); 
-    }
+        // Renk/Varyant
+        const currentRenkValue = document.getElementById('renk_input')?.value || data.renk;
+        if (data.renk_varyantlar && data.renk_varyantlar.length > 0) {
+            renkContainer.innerHTML = createSelect('renk_input', data.renk_varyantlar, currentRenkValue);
+        } else {
+            renkContainer.innerHTML = createInput('renk_input', 'Renk/Varyant (Opsiyonel)', currentRenkValue);
+        }
+        
+        // Dinamik olarak eklenen input/select için olay dinleyicilerini yeniden kur
+        setupAutoSearchListeners(); 
+    }
 
-    // **********************************************
-    // 2. AKILLI STOK ARAMA (AJAX)
-    // **********************************************
-    function akilliStokAra(seriNo = 'YOK', stokKod = 'YOK', partiNo = 'YOK', renk = 'YOK', depoKod = DEPO_KODU) {
-        resetUIBeforeSearch(); // Arayüzü temizle
-        // Bu kısım arka uca arama isteği gönderir ve sonucu updateUIAfterSearch ile işler
+    // **********************************************
+    // 2. AKILLI STOK ARAMA (AJAX)
+    // **********************************************
+    function akilliStokAra(seriNo = 'YOK', stokKod = 'YOK', partiNo = 'YOK', renk = 'YOK', depoKod = DEPO_KODU) {
+        resetUIBeforeSearch(); // Arayüzü temizle
+        // Bu kısım arka uca arama isteği gönderir ve sonucu updateUIAfterSearch ile işler
 
-        const params = new URLSearchParams({
-            seri_no: seriNo,
-            stok_kod: stokKod,
-            parti_no: partiNo,
-            renk: renk,
-            depo_kod: depoKod,
-            barkod_ham_veri: seriNo !== 'YOK' ? seriNo : 'YOK', 
-            sayim_emri_id: SAYIM_EMRI_ID 
-        });
+        const params = new URLSearchParams({
+            seri_no: seriNo,
+            stok_kod: stokKod,
+            parti_no: partiNo,
+            renk: renk,
+            depo_kod: depoKod,
+            barkod_ham_veri: seriNo !== 'YOK' ? seriNo : 'YOK', 
+            sayim_emri_id: SAYIM_EMRI_ID 
+        });
 
-        const url = `{% url 'ajax_akilli_stok_ara' %}?${params.toString()}`;
+        const url = `{% url 'ajax_akilli_stok_ara' %}?${params.toString()}`;
 
-        fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(errData => {
-                        throw new Error(`Sunucu Hatası (${response.status}): ${errData.urun_bilgi || errData.message || 'Bilinmeyen hata'}`);
-                    }).catch(() => {
-                        throw new Error(`Sunucu Hatası (${response.status}). Yanıt alınamadı veya JSON değil.`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                updateUIAfterSearch(data); // Arayüzü güncelle
-            })
-            .catch(error => {
-                console.error("Akıllı Arama Hatası:", error);
-                showMessage('kayit_mesaji', `Arama Hatası: ${error.message}`, 'error');
-                 updateUIAfterSearch({ 
-                     found: false, urun_bilgi: `Arama Hatası: ${error.message}`,
-                     stok_kod: stokKod, parti_no: partiNo, renk: renk 
-                    });
-            });
-    }
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errData => {
+                        throw new Error(`Sunucu Hatası (${response.status}): ${errData.urun_bilgi || errData.message || 'Bilinmeyen hata'}`);
+                    }).catch(() => {
+                        throw new Error(`Sunucu Hatası (${response.status}). Yanıt alınamadı veya JSON değil.`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                updateUIAfterSearch(data); // Arayüzü güncelle
+            })
+            .catch(error => {
+                console.error("Akıllı Arama Hatası:", error);
+                showMessage('kayit_mesaji', `Arama Hatası: ${error.message}`, 'error');
+                 updateUIAfterSearch({ 
+                     found: false, urun_bilgi: `Arama Hatası: ${error.message}`,
+                     stok_kod: stokKod, parti_no: partiNo, renk: renk 
+                    });
+            });
+    }
 
-    // **********************************************
-    // 3. GEMINI OCR ANALİZİ (AJAX POST)
-    // **********************************************
-    function geminiOku(file) {
-        if (!GEMINI_AVAILABLE) {
-            showMessage('gemini_mesaj', 'Gemini API anahtarı ayarlanmadığı için bu özellik kullanılamıyor.', 'warning');
-            return;
-        }
+    // **********************************************
+    // 3. GEMINI OCR ANALİZİ (AJAX POST)
+    // **********************************************
+    function geminiOku(file) {
+        if (!GEMINI_AVAILABLE) {
+            showMessage('gemini_mesaj', 'Gemini API anahtarı ayarlanmadığı için bu özellik kullanılamıyor.', 'warning');
+            return;
+        }
 
-        showMessage('gemini_mesaj', '📸 Görsel yükleniyor ve Gemini ile analiz ediliyor... Lütfen bekleyin.', 'info', 0); // Kapanmasın
-        topluSonucAlani.style.display = 'none';
-        sonucTablosuBody.innerHTML = '';
-        selectFileBtn.disabled = true; // Butonları pasif yap
-        cameraBtn.disabled = true;
-        
-        const formData = new FormData();
-        formData.append('image_file', file);
+        showMessage('gemini_mesaj', '📸 Görsel yükleniyor ve Gemini ile analiz ediliyor... Lütfen bekleyin.', 'info', 0); // Kapanmasın
+        topluSonucAlani.style.display = 'none';
+        sonucTablosuBody.innerHTML = '';
+        selectFileBtn.disabled = true; // Butonları pasif yap
+        cameraBtn.disabled = true;
+        
+        const formData = new FormData();
+        formData.append('image_file', file);
 
-        fetch('{% url "gemini_ocr_analiz" %}', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
-            body: formData
-        })
-        .then(res => {
-             if (!res.ok) {
-                 return res.json().then(errData => {
-                     throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen YZ hatası'}`);
-                 }).catch(() => {
-                     throw new Error(`Sunucu Hatası (${res.status})`);
-                 });
-             }
-             return res.json();
-        })
-        .then(data => {
-            if (data.success && data.results?.length > 0) {
-                showMessage('gemini_mesaj', data.message, 'success');
-                topluSonucSayisi.innerText = data.count;
-                
-                data.results.forEach(item => {
-                    const row = sonucTablosuBody.insertRow();
-                    row.insertCell().innerHTML = `<p style="font-weight: bold; margin: 0;">${item.barkod !== 'YOK' ? item.barkod : item.stok_kod}</p><span style="font-size: 0.8em; color: gray;">${item.barkod === 'YOK' ? 'Sadece Kod' : 'Barkod'}</span>`;
-                    const miktarCell = row.insertCell();
-                    miktarCell.innerText = item.miktar;
-                    miktarCell.style.textAlign = 'right';
-                    miktarCell.style.fontWeight = 'bold';
-                    row.insertCell().innerHTML = `<p style="margin: 0;">P: ${item.parti_no}</p><p style="margin: 0;">R: ${item.renk}</p>`;
-                    
-                    const islemBtn = document.createElement('button');
-                    islemBtn.innerText = 'SEÇ';
-                    islemBtn.onclick = function() {
-                        barkodInput.value = item.barkod !== 'YOK' ? item.barkod : '';
-                        stokKodInput.value = item.stok_kod !== 'YOK' ? item.stok_kod : '';
-                        miktarInput.value = item.miktar;
-                         const partiEl = document.getElementById('parti_no_input');
-                         if(partiEl) partiEl.value = item.parti_no !== 'YOK' ? item.parti_no : '';
-                         const renkEl = document.getElementById('renk_input');
-                         if(renkEl) renkEl.value = item.renk !== 'YOK' ? item.renk : '';
+        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        // KRİTİK DÜZELTME: URL adı 'gemini_ocr_analiz' yerine 'ajax_gemini_ocr' yapıldı.
+        fetch('{% url "ajax_gemini_ocr" %}', {
+        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: formData
+        })
+        .then(res => {
+             if (!res.ok) {
+                 return res.json().then(errData => {
+                     throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen YZ hatası'}`);
+                 }).catch(() => {
+                     throw new Error(`Sunucu Hatası (${res.status})`);
+                 });
+             }
+             return res.json();
+        })
+        .then(data => {
+            if (data.success && data.results?.length > 0) {
+                showMessage('gemini_mesaj', data.message, 'success');
+                topluSonucSayisi.innerText = data.count;
+                
+                data.results.forEach(item => {
+                    const row = sonucTablosuBody.insertRow();
+                    row.insertCell().innerHTML = `<p style="font-weight: bold; margin: 0;">${item.barkod !== 'YOK' ? item.barkod : item.stok_kod}</p><span style="font-size: 0.8em; color: gray;">${item.barkod === 'YOK' ? 'Sadece Kod' : 'Barkod'}</span>`;
+                    const miktarCell = row.insertCell();
+                    miktarCell.innerText = item.miktar;
+                    miktarCell.style.textAlign = 'right';
+                    miktarCell.style.fontWeight = 'bold';
+                    row.insertCell().innerHTML = `<p style="margin: 0;">P: ${item.parti_no}</p><p style="margin: 0;">R: ${item.renk}</p>`;
+                    
+                    const islemBtn = document.createElement('button');
+                    islemBtn.innerText = 'SEÇ';
+                    islemBtn.onclick = function() {
+                        barkodInput.value = item.barkod !== 'YOK' ? item.barkod : '';
+                        stokKodInput.value = item.stok_kod !== 'YOK' ? item.stok_kod : '';
+                        miktarInput.value = item.miktar;
+                         const partiEl = document.getElementById('parti_no_input');
+                         if(partiEl) partiEl.value = item.parti_no !== 'YOK' ? item.parti_no : '';
+                         const renkEl = document.getElementById('renk_input');
+                         if(renkEl) renkEl.value = item.renk !== 'YOK' ? item.renk : '';
 
-                         akilliStokAra(
-                             item.barkod !== 'YOK' ? item.barkod : 'YOK', 
-                             item.barkod === 'YOK' ? item.stok_kod : 'YOK', // Barkod yoksa stokla ara
-                             item.parti_no, 
-                             item.renk, 
-                             DEPO_KODU
-                         );
-                          Array.from(sonucTablosuBody.rows).forEach(r => r.style.backgroundColor = '');
-                          row.style.backgroundColor = '#e6f7ff';
-                      };
-                      row.insertCell().appendChild(islemBtn);
-                });
-                topluSonucAlani.style.display = 'block';
+                         akilliStokAra(
+                             item.barkod !== 'YOK' ? item.barkod : 'YOK', 
+                             item.barkod === 'YOK' ? item.stok_kod : 'YOK', // Barkod yoksa stokla ara
+                             item.parti_no, 
+                             item.renk, 
+                             DEPO_KODU
+                         );
+                          Array.from(sonucTablosuBody.rows).forEach(r => r.style.backgroundColor = '');
+                          row.style.backgroundColor = '#e6f7ff';
+                      };
+                      row.insertCell().appendChild(islemBtn);
+                });
+                topluSonucAlani.style.display = 'block';
 
-            } else {
-                showMessage('gemini_mesaj', data.message || 'Görselde geçerli etiket bulunamadı.', 'warning');
-            }
-        })
-        .catch(error => {
-            console.error("Gemini Analiz Hatası:", error);
-            showMessage('gemini_mesaj', `❌ YZ Hatası: ${error.message}`, 'error');
-        })
-        .finally(() => {
-             selectFileBtn.disabled = false; 
-             cameraBtn.disabled = false;
-        });
-    }
+            } else {
+                showMessage('gemini_mesaj', data.message || 'Görselde geçerli etiket bulunamadı.', 'warning');
+            }
+        })
+        .catch(error => {
+            console.error("Gemini Analiz Hatası:", error);
+            showMessage('gemini_mesaj', `❌ YZ Hatası: ${error.message}`, 'error');
+        })
+        .finally(() => {
+             selectFileBtn.disabled = false; 
+             cameraBtn.disabled = false;
+        });
+    }
 
-    // **********************************************
-    // 4. KONUM ALMA (ASYNC)
-    // **********************************************
-    function getCurrentLocation() {
-        return new Promise((resolve) => { 
-            if (!navigator.geolocation) {
-                resolve({ latitude: 'YOK', longitude: 'YOK', error: 'Tarayıcı desteklemiyor' });
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    resolve({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        error: null 
-                    });
-                },
-                (error) => {
-                    let message = 'Konum alınamadı';
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED: message = 'Konum izni reddedildi'; break;
-                        case error.POSITION_UNAVAILABLE: message = 'Konum bilgisi mevcut değil'; break;
-                        case error.TIMEOUT: message = 'Konum alma zaman aşımına uğradı'; break;
-                    }
-                    resolve({ latitude: 'YOK', longitude: 'YOK', error: message });
-                },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } 
-            );
-        });
-    }
-
-
-    // **********************************************
-    // 5. SAYIM KAYDETME (AJAX POST) - YENİ STOK OLUŞTURMA İÇİN GEREKLİ ALANLAR EKLENDİ
-    // **********************************************
-    async function kaydetSayim() { 
-        const miktarValue = miktarInput.value;
-        
-        if (!currentBenzersizId) { 
-            showMessage('kayit_mesaji', 'Lütfen önce geçerli bir stok arayın veya seçin.', 'error');
-            return;
-        }
-
-        // Arama inputlarından güncel (veya yeni girilen) değerleri al
-        const manuelStokKod = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
-        const manuelPartiNo = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
-        const manuelRenk = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
-        
-        // Stok Kodu (Benzersiz ID'yi ayrıştırmak için kullanılacak)
-        const finalStokKod = manuelStokKod !== 'YOK' ? manuelStokKod : currentStokKod; 
-        
-        let miktarDecimal;
-        try {
-             miktarDecimal = parseFloat(miktarValue.replace(',', '.'));
-             if (isNaN(miktarDecimal) || miktarDecimal <= 0) {
-                 throw new Error("Miktar sıfırdan büyük olmalıdır.");
-             }
-        } catch {
-             showMessage('kayit_mesaji', 'Geçersiz miktar girdiniz. Lütfen sayısal bir değer girin (örn: 1.00).', 'error');
-             return;
-        }
-
-        showMessage('kayit_mesaji', 'Konum bilgisi alınıyor...', 'info', 0); 
-        kaydetBtn.disabled = true; 
-
-        const locationData = await getCurrentLocation(); // Konumu al
-        
-        showMessage('kayit_mesaji', 'Kaydediliyor...', 'info', 0); 
-
-        // --- GEREKLİ YENİ ALANLAR EKLENİYOR ---
-        const dataToSend = {
-            benzersiz_id: currentBenzersizId, 
-            miktar: miktarValue, 
-            personel_adi: PERSONEL_ADI,
-            lat: locationData.latitude,
-            lon: locationData.longitude,
-            
-            // YENİ STOK OLUŞTURMAK İÇİN GEREKEN BİLGİLER
-            stok_kod: finalStokKod,              
-            depo_kod: DEPO_KODU,                 
-            parti_no: manuelPartiNo,             
-            renk: manuelRenk,                    
-            malzeme_adi: `Yeni Stok (${finalStokKod})`, 
-            olcu_birimi: 'ADET'                  
-        };
-
-        const url = `/ajax/sayim-kaydet/${SAYIM_EMRI_ID}`; 
-
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                "Content-Type": "application/json",
-                'X-CSRFToken': getCookie('csrftoken'), 
-            },
-            body: JSON.stringify(dataToSend)
-        })
-        .then(res => {
-             if (!res.ok) {
-                 return res.json().then(errData => {
-                     throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen kayıt hatası'}`);
-                 }).catch(() => {
-                     throw new Error(`Sunucu Hatası (${res.status}). Kayıt başarısız.`);
-                 });
-             }
-             return res.json();
-        })
-        .then(data => {
-            if (data.success) {
-                let successMessage = data.message;
-                 if (locationData.error && locationData.error !== 'Tarayıcı desteklemiyor') {
-                     successMessage += ` (Uyarı: ${locationData.error})`;
-                     showMessage('kayit_mesaji', successMessage, 'warning', 7000); 
-                 } else {
-                     showMessage('kayit_mesaji', successMessage, 'success');
-                 }
-                sayilanStokGoster.innerText = data.yeni_miktar || '0.00'; 
-                miktarInput.value = ''; 
-                barkodInput.focus(); 
-                barkodInput.select(); 
-                
-            } else {
-                showMessage('kayit_mesaji', `HATA: ${data.message}`, 'error', 0); 
-            }
-        })
-        .catch(error => {
-            console.error("Sayım Kaydetme Hatası:", error);
-            showMessage('kayit_mesaji', `Kritik Kayıt Hatası: ${error.message}`, 'error', 0);
-        })
-        .finally(() => {
-            if (currentBenzersizId) {
-                kaydetBtn.disabled = false; 
-            }
-        });
-    }
-
-    // **********************************************
-    // 6. OLAY DİNLEYİCİLERİ KURULUMU
-    // **********************************************
-    function setupEventListeners() {
-        araBtn.addEventListener('click', handleManualSearch);
-        
-        setupAutoSearchListeners(); 
-
-        miktarInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault(); 
-                kaydetSayim();
-            }
-        });
-
-        kaydetBtn.addEventListener('click', kaydetSayim);
-
-        selectFileBtn.addEventListener('click', () => {
-             imageInput.removeAttribute('capture'); 
-             imageInput.click();
-           });
-           cameraBtn.addEventListener('click', () => {
-             imageInput.setAttribute('capture', 'environment'); 
-             imageInput.click();
-           });
-           imageInput.addEventListener('change', function() {
-             if (this.files && this.files.length > 0) {
-                 geminiOku(this.files[0]); 
-             }
-             this.value = null; 
-             this.removeAttribute('capture'); 
-           });
-    }
-    
-    // Manuel Arama Butonu İşleyicisi
-    function handleManualSearch() {
-        const stokKod = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
-        const partiNo = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK'; 
-        const renk = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
-        akilliStokAra('YOK', stokKod, partiNo, renk, DEPO_KODU);
-    }
-
-    // Input/Select için Otomatik Arama Dinleyicileri
-    function setupAutoSearchListeners() {
-        const elementsToListen = [
-            document.getElementById('barkod_input'), 
-            document.getElementById('stok_kod_input'), 
-            document.getElementById('parti_no_input'), 
-            document.getElementById('renk_input')
-        ];
-
-        elementsToListen.forEach(input => {
-            if (input) {
-                input.removeEventListener('keydown', handleSearchTrigger);
-                input.removeEventListener('change', handleSearchTrigger);
-                
-                if (input.tagName === 'INPUT' && input.type === 'text') {
-                    input.addEventListener('keydown', handleSearchTrigger);
-                } else if (input.tagName === 'SELECT') {
-                    input.addEventListener('change', handleSearchTrigger);
-                }
-            }
-        });
-    }
-
-    // Arama Tetikleyici (Enter veya Select Değişimi)
-    function handleSearchTrigger(event) {
-        if (event.type === 'keydown' && event.key !== 'Enter') return;
-        
-        if (event.type === 'keydown') event.preventDefault(); 
-
-        const sourceElementId = event.target.id;
-        
-        const seriNoVal = document.getElementById('barkod_input')?.value.toUpperCase().trim() || 'YOK';
-        const stokKodVal = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
-        const partiNoVal = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
-        const renkVal = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
-
-        if (sourceElementId === 'barkod_input' && seriNoVal !== 'YOK') { // Sadece barkod girilmişse tam arama
-            akilliStokAra(seriNoVal, 'YOK', 'YOK', 'YOK', DEPO_KODU);
-        } else if (stokKodVal !== 'YOK') { // Veya Stok kodu girilmişse detaylı arama
-             akilliStokAra('YOK', stokKodVal, partiNoVal, renkVal, DEPO_KODU);
-        }
-    }
+    // **********************************************
+    // 4. KONUM ALMA (ASYNC)
+    // **********************************************
+    function getCurrentLocation() {
+        return new Promise((resolve) => { 
+            if (!navigator.geolocation) {
+                resolve({ latitude: 'YOK', longitude: 'YOK', error: 'Tarayıcı desteklemiyor' });
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        error: null 
+                    });
+                },
+                (error) => {
+                    let message = 'Konum alınamadı';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED: message = 'Konum izni reddedildi'; break;
+                        case error.POSITION_UNAVAILABLE: message = 'Konum bilgisi mevcut değil'; break;
+                        case error.TIMEOUT: message = 'Konum alma zaman aşımına uğradı'; break;
+                    }
+                    resolve({ latitude: 'YOK', longitude: 'YOK', error: message });
+                },
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 } 
+            );
+        });
+    }
 
 
-    // **********************************************
-    // SAYFA YÜKLENDİĞİNDE BAŞLATMA
-    // **********************************************
-    document.addEventListener('DOMContentLoaded', () => {
-        // --- DOM Elementlerini Seç ---
-        barkodInput = document.getElementById('barkod_input');
-        stokKodInput = document.getElementById('stok_kod_input');
-        partiNoContainer = document.getElementById('parti_no_container');
-        renkContainer = document.getElementById('renk_container');
-        araBtn = document.getElementById('ara-btn');
-        miktarInput = document.getElementById('miktar_input');
-        kaydetBtn = document.getElementById('sayim_kaydet_btn');
-        urunBilgiAlani = document.getElementById('urun_bilgi_alani');
-        urunBilgi = document.getElementById('urun_bilgi');
-        sistemStokGoster = document.getElementById('sistem_stok_goster');
-        sayilanStokGoster = document.getElementById('sayilan_stok_goster');
-        lastSayimGoster = document.getElementById('last_sayim_goster');
-        farkliDepoUyariAlani = document.getElementById('farkli_depo_uyari_alani');
-        kayitMesaji = document.getElementById('kayit_mesaji');
-        geminiMesaj = document.getElementById('gemini_mesaj');
-        topluSonucAlani = document.getElementById('toplu_sonuc_alani');
-        topluSonucSayisi = document.getElementById('toplu_sonuc_sayisi');
-        sonucTablosuBody = document.getElementById('sonuc_tablosu').getElementsByTagName('tbody')[0];
-        imageInput = document.getElementById('image-input');
-        selectFileBtn = document.getElementById('select-file-btn');
-        cameraBtn = document.getElementById('camera-btn');
+    // **********************************************
+    // 5. SAYIM KAYDETME (AJAX POST) - YENİ STOK OLUŞTURMA İÇİN GEREKLİ ALANLAR EKLENDİ
+    // **********************************************
+    async function kaydetSayim() { 
+        const miktarValue = miktarInput.value;
+        
+        if (!currentBenzersizId) { 
+            showMessage('kayit_mesaji', 'Lütfen önce geçerli bir stok arayın veya seçin.', 'error');
+            return;
+        }
 
-        // --- Başlangıç Değerlerini Ayarla ---
-        DEPO_KODU = document.getElementById('depo_kodu_gizli').innerText.trim();
-        PERSONEL_ADI = document.getElementById('personel_adi_gizli').innerText.trim();
-        
-        // --- Olay Dinleyicilerini Kur ---
-        setupEventListeners();
+        // Arama inputlarından güncel (veya yeni girilen) değerleri al
+        const manuelStokKod = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
+        const manuelPartiNo = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
+        const manuelRenk = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
+        
+        // Stok Kodu (Benzersiz ID'yi ayrıştırmak için kullanılacak)
+        const finalStokKod = manuelStokKod !== 'YOK' ? manuelStokKod : currentStokKod; 
+        
+        let miktarDecimal;
+        try {
+             miktarDecimal = parseFloat(miktarValue.replace(',', '.'));
+             if (isNaN(miktarDecimal) || miktarDecimal <= 0) {
+                 throw new Error("Miktar sıfırdan büyük olmalıdır.");
+             }
+        } catch {
+             showMessage('kayit_mesaji', 'Geçersiz miktar girdiniz. Lütfen sayısal bir değer girin (örn: 1.00).', 'error');
+             return;
+        }
 
-        // --- Sayfa Yüklendiğinde İlk Boş Aramayı Yap (isteğe bağlı) ---
-        barkodInput.focus();
-    });
+        showMessage('kayit_mesaji', 'Konum bilgisi alınıyor...', 'info', 0); 
+        kaydetBtn.disabled = true; 
+
+        const locationData = await getCurrentLocation(); // Konumu al
+        
+        showMessage('kayit_mesaji', 'Kaydediliyor...', 'info', 0); 
+
+        // --- GEREKLİ YENİ ALANLAR EKLENİYOR ---
+        const dataToSend = {
+            benzersiz_id: currentBenzersizId, 
+            miktar: miktarValue, 
+            personel_adi: PERSONEL_ADI,
+            lat: locationData.latitude,
+            lon: locationData.longitude,
+            
+            // YENİ STOK OLUŞTURMAK İÇİN GEREKEN BİLGİLER
+            stok_kod: finalStokKod,              
+            depo_kod: DEPO_KODU,                 
+            parti_no: manuelPartiNo,             
+            renk: manuelRenk,                    
+            malzeme_adi: `Yeni Stok (${finalStokKod})`, 
+            olcu_birimi: 'ADET'                  
+        };
+
+        const url = `/ajax/sayim-kaydet/${SAYIM_EMRI_ID}`; 
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json",
+                'X-CSRFToken': getCookie('csrftoken'), 
+            },
+            body: JSON.stringify(dataToSend)
+        })
+        .then(res => {
+             if (!res.ok) {
+                 return res.json().then(errData => {
+                     throw new Error(`Sunucu Hatası (${res.status}): ${errData.message || 'Bilinmeyen kayıt hatası'}`);
+                 }).catch(() => {
+                     throw new Error(`Sunucu Hatası (${res.status}). Kayıt başarısız.`);
+                 });
+             }
+             return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                let successMessage = data.message;
+                 if (locationData.error && locationData.error !== 'Tarayıcı desteklemiyor') {
+                     successMessage += ` (Uyarı: ${locationData.error})`;
+                     showMessage('kayit_mesaji', successMessage, 'warning', 7000); 
+                 } else {
+                     showMessage('kayit_mesaji', successMessage, 'success');
+                 }
+                sayilanStokGoster.innerText = data.yeni_miktar || '0.00'; 
+                miktarInput.value = ''; 
+                barkodInput.focus(); 
+                barkodInput.select(); 
+                
+            } else {
+                showMessage('kayit_mesaji', `HATA: ${data.message}`, 'error', 0); 
+            }
+        })
+        .catch(error => {
+            console.error("Sayım Kaydetme Hatası:", error);
+            showMessage('kayit_mesaji', `Kritik Kayıt Hatası: ${error.message}`, 'error', 0);
+        })
+        .finally(() => {
+            if (currentBenzersizId) {
+                kaydetBtn.disabled = false; 
+            }
+        });
+    }
+
+    // **********************************************
+    // 6. OLAY DİNLEYİCİLERİ KURULUMU
+    // **********************************************
+    function setupEventListeners() {
+        araBtn.addEventListener('click', handleManualSearch);
+        
+        setupAutoSearchListeners(); 
+
+        miktarInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); 
+                kaydetSayim();
+            }
+        });
+
+        kaydetBtn.addEventListener('click', kaydetSayim);
+
+        selectFileBtn.addEventListener('click', () => {
+             imageInput.removeAttribute('capture'); 
+             imageInput.click();
+           });
+           cameraBtn.addEventListener('click', () => {
+             imageInput.setAttribute('capture', 'environment'); 
+             imageInput.click();
+           });
+           imageInput.addEventListener('change', function() {
+             if (this.files && this.files.length > 0) {
+                 geminiOku(this.files[0]); 
+             }
+             this.value = null; 
+             this.removeAttribute('capture'); 
+           });
+    }
+    
+    // Manuel Arama Butonu İşleyicisi
+    function handleManualSearch() {
+        const stokKod = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
+        const partiNo = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK'; 
+        const renk = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
+        akilliStokAra('YOK', stokKod, partiNo, renk, DEPO_KODU);
+    }
+
+    // Input/Select için Otomatik Arama Dinleyicileri
+    function setupAutoSearchListeners() {
+        const elementsToListen = [
+            document.getElementById('barkod_input'), 
+            document.getElementById('stok_kod_input'), 
+            document.getElementById('parti_no_input'), 
+            document.getElementById('renk_input')
+        ];
+
+        elementsToListen.forEach(input => {
+            if (input) {
+                input.removeEventListener('keydown', handleSearchTrigger);
+                input.removeEventListener('change', handleSearchTrigger);
+                
+                if (input.tagName === 'INPUT' && input.type === 'text') {
+                    input.addEventListener('keydown', handleSearchTrigger);
+                } else if (input.tagName === 'SELECT') {
+                    input.addEventListener('change', handleSearchTrigger);
+                }
+            }
+        });
+    }
+
+    // Arama Tetikleyici (Enter veya Select Değişimi)
+    function handleSearchTrigger(event) {
+        if (event.type === 'keydown' && event.key !== 'Enter') return;
+        
+        if (event.type === 'keydown') event.preventDefault(); 
+
+        const sourceElementId = event.target.id;
+        
+        const seriNoVal = document.getElementById('barkod_input')?.value.toUpperCase().trim() || 'YOK';
+        const stokKodVal = document.getElementById('stok_kod_input')?.value.toUpperCase().trim() || 'YOK';
+        const partiNoVal = document.getElementById('parti_no_input')?.value.toUpperCase().trim() || 'YOK';
+        const renkVal = document.getElementById('renk_input')?.value.toUpperCase().trim() || 'YOK';
+
+        if (sourceElementId === 'barkod_input' && seriNoVal !== 'YOK') { // Sadece barkod girilmişse tam arama
+            akilliStokAra(seriNoVal, 'YOK', 'YOK', 'YOK', DEPO_KODU);
+        } else if (stokKodVal !== 'YOK') { // Veya Stok kodu girilmişse detaylı arama
+             akilliStokAra('YOK', stokKodVal, partiNoVal, renkVal, DEPO_KODU);
+        }
+    }
+
+
+    // **********************************************
+    // SAYFA YÜKLENDİĞİNDE BAŞLATMA
+    // **********************************************
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elementlerini Seç ---
+        barkodInput = document.getElementById('barkod_input');
+        stokKodInput = document.getElementById('stok_kod_input');
+        partiNoContainer = document.getElementById('parti_no_container');
+        renkContainer = document.getElementById('renk_container');
+        araBtn = document.getElementById('ara-btn');
+        miktarInput = document.getElementById('miktar_input');
+        kaydetBtn = document.getElementById('sayim_kaydet_btn');
+        urunBilgiAlani = document.getElementById('urun_bilgi_alani');
+        urunBilgi = document.getElementById('urun_bilgi');
+        sistemStokGoster = document.getElementById('sistem_stok_goster');
+        sayilanStokGoster = document.getElementById('sayilan_stok_goster');
+        lastSayimGoster = document.getElementById('last_sayim_goster');
+        farkliDepoUyariAlani = document.getElementById('farkli_depo_uyari_alani');
+        kayitMesaji = document.getElementById('kayit_mesaji');
+        geminiMesaj = document.getElementById('gemini_mesaj');
+        topluSonucAlani = document.getElementById('toplu_sonuc_alani');
+        topluSonucSayisi = document.getElementById('toplu_sonuc_sayisi');
+        sonucTablosuBody = document.getElementById('sonuc_tablosu').getElementsByTagName('tbody')[0];
+        imageInput = document.getElementById('image-input');
+        selectFileBtn = document.getElementById('select-file-btn');
+        cameraBtn = document.getElementById('camera-btn');
+
+        // --- Başlangıç Değerlerini Ayarla ---
+        DEPO_KODU = document.getElementById('depo_kodu_gizli').innerText.trim();
+        PERSONEL_ADI = document.getElementById('personel_adi_gizli').innerText.trim();
+        
+        // --- Olay Dinleyicilerini Kur ---
+        setupEventListeners();
+
+        // --- Sayfa Yüklendiğinde İlk Boş Aramayı Yap (isteğe bağlı) ---
+        barkodInput.focus();
+    });
 </script>
 </body>
 </html>
