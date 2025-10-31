@@ -24,9 +24,9 @@ import xlsxwriter
 from io import BytesIO as IO_Bytes 
 
 
-# Varsayılan modelleri ve yeni formu içe aktar
+# Varsayılan modelleri ve formu içe aktar
 from .models import SayimEmri, SayimDetay, Malzeme 
-from .forms import SayimEmriForm # <<< YENİ FORMU İÇE AKTARDIK
+from .forms import SayimEmriForm 
 
 # --- YARDIMCI FONKSİYONLAR (CORE MANTIK) ---
 
@@ -97,7 +97,7 @@ def create_or_update_malzeme(data):
 @login_required
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
-    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih') 
+    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
     return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
 @login_required
@@ -176,7 +176,7 @@ def personel_login(request):
 def yeni_sayim_emri(request):
     """Yeni sayım emri oluşturur ve Sayım Emri Listesine yönlendirir."""
     if request.method == 'POST':
-        form = SayimEmriForm(request.POST) # Formu al
+        form = SayimEmriForm(request.POST) 
         if form.is_valid():
             yeni_emir = form.save(commit=False)
             yeni_emir.durum = 'BASLADI' 
@@ -184,8 +184,7 @@ def yeni_sayim_emri(request):
             yeni_emir.save()
             
             # Başarılı kayıttan sonra Sayım Emri Listesi'ne yönlendir
-            return redirect('sayim_emri_listesi') 
-        # Form geçerli değilse, hatalı formu tekrar göster (aşağıdaki return ile)
+            return redirect('sayim_emirleri') 
     else:
         form = SayimEmriForm() # Boş formu göster
     
@@ -282,13 +281,13 @@ def upload_and_reload_stok_data(request):
                     _, created = Malzeme.objects.update_or_create(
                         benzersiz_id=bid,
                         defaults={
-                            'malzeme_kodu': stok_kod_excel, # ALAN ADI DÜZELTİLDİ
+                            'malzeme_kodu': stok_kod_excel, 
                             'malzeme_adi': row['Stok Adı'] or f"Stok {stok_kod_excel}",
-                            'lokasyon_kodu': lokasyon_kodu, # Modeldeki doğru alan adı
+                            'lokasyon_kodu': lokasyon_kodu, 
                             'parti_no': parti_no,
                             'renk': renk,
                             'olcu_birimi': row['Birim'],
-                            'sistem_stogu': stok_miktari, # ALAN ADI DÜZELTİLDİ
+                            'sistem_stogu': stok_miktari, 
                             'birim_fiyat': birim_fiyati,
                             'seri_no': row['seri_no'], 
                             'barkod': row['barkod'], 
