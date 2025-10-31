@@ -44,8 +44,13 @@
     </form>
 
     <hr style="margin-top: 20px;">
-    <a href="{% url 'yonetim_araclari' %}">
-        <button type="button" class="btn-secondary">ADMIN: Stok Verisi Yükle</button>
-    </a>
+    <div style="display: flex; gap: 10px;">
+        <a href="{% url 'yeni_sayim_emri' %}" style="flex: 1;">
+            <button type="button" style="background-color: #17a2b8;">YENİ SAYIM EMRİ AÇ</button>
+        </a>
+        <a href="{% url 'yonetim_araclari' %}" style="flex: 1;">
+            <button type="button" class="btn-secondary">ADMIN: Veri Yükle</button>
+        </a>
+    </div>
 </body>
 </html>

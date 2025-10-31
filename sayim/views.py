@@ -29,17 +29,16 @@ from .models import SayimEmri, SayimDetay, Malzeme
 
 # --- YARDIMCI FONKSİYONLAR (CORE MANTIK) ---
 
-# DÜZELTME: generate_unique_id'deki depo_kod alias'ını koruduk, stok kodunu da düzelttik
-def generate_unique_id(stok_kod_alias, parti_no, depo_kod_alias, renk):
+def generate_unique_id(stok_kod, parti_no, depo_kod, renk):
     """
     Stok Kodu, Parti No, Depo Kodu ve Renk/Varyantı birleştirerek benzersiz bir ID oluşturur.
     """
-    stok_kod_alias = stok_kod_alias.upper().strip()
+    stok_kod = stok_kod.upper().strip()
     parti_no = parti_no.upper().strip() if parti_no else 'YOK'
-    depo_kod_alias = depo_kod_alias.upper().strip()
+    depo_kod = depo_kod.upper().strip()
     renk = renk.upper().strip() if renk else 'YOK'
     
-    return f"{stok_kod_alias}_{parti_no}_{depo_kod_alias}_{renk}".replace(" ", "")
+    return f"{stok_kod}_{parti_no}_{depo_kod}_{renk}".replace(" ", "")
 
 def get_malzeme_from_unique_id(unique_id):
     """Benzersiz ID'den Malzeme nesnesini bulur."""
@@ -48,11 +47,11 @@ def get_malzeme_from_unique_id(unique_id):
     except Malzeme.DoesNotExist:
         parts = unique_id.split('_')
         if len(parts) == 4:
-            stok_kod_alias, parti_no, depo_kod_alias, renk = parts
+            stok_kod, parti_no, depo_kod_alias, renk = parts
             try:
-                # MODEL ALANI DÜZELTİLDİ: Malzeme.objects.get(malzeme_kodu=..., lokasyon_kodu=...)
+                # MODEL ALANI: lokasyon_kodu
                 return Malzeme.objects.get(
-                    malzeme_kodu=stok_kod_alias, parti_no=parti_no, lokasyon_kodu=depo_kod_alias, renk=renk
+                    stok_kod=stok_kod, parti_no=parti_no, lokasyon_kodu=depo_kod_alias, renk=renk
                 )
             except Malzeme.DoesNotExist:
                 return None
@@ -65,26 +64,26 @@ def create_or_update_malzeme(data):
     """
     Verilen verilerle bir Malzeme nesnesi oluşturur veya günceller (UPSERT).
     """
-    stok_kod_alias = data.get('stok_kod', 'YOK').upper().strip() # Gelen veri
-    depo_kod_alias = data.get('depo_kod', 'YOK').upper().strip()
+    stok_kod = data.get('stok_kod', 'YOK').upper().strip()
+    depo_kod = data.get('depo_kod', 'YOK').upper().strip()
     parti_no = data.get('parti_no', 'YOK').upper().strip()
     renk = data.get('renk', 'YOK').upper().strip()
     
-    unique_id = generate_unique_id(stok_kod_alias, parti_no, depo_kod_alias, renk)
+    unique_id = generate_unique_id(stok_kod, parti_no, depo_kod, renk)
     
-    if stok_kod_alias == 'YOK' or depo_kod_alias == 'YOK':
+    if stok_kod == 'YOK' or depo_kod == 'YOK':
         raise ValueError("Stok ve Depo Kodu olmadan Malzeme oluşturulamaz.")
 
     malzeme, created = Malzeme.objects.update_or_create(
         benzersiz_id=unique_id,
         defaults={
-            'malzeme_kodu': stok_kod_alias, # <<< ALAN ADI DÜZELTİLDİ
-            'malzeme_adi': data.get('malzeme_adi', f"Yeni Stok: {stok_kod_alias}"),
-            'lokasyon_kodu': depo_kod_alias, # Düzeltildi: lokasyon_kodu
+            'malzeme_kodu': stok_kod, # Düzeltildi: malzeme_kodu
+            'malzeme_adi': data.get('malzeme_adi', f"Yeni Stok: {stok_kod}"),
+            'lokasyon_kodu': depo_kod, 
             'parti_no': parti_no,
             'renk': renk,
             'olcu_birimi': data.get('olcu_birimi', 'ADET'),
-            'sistem_stogu': Decimal('0.00'), # <<< ALAN ADI DÜZELTİLDİ
+            'sistem_stogu': Decimal('0.00'), # Düzeltildi: sistem_stogu
             'aktif': True,
         }
     )
@@ -93,10 +92,11 @@ def create_or_update_malzeme(data):
 
 # --- WEB SAYFASI VIEW'LARI ---
 
+# Bu, uygulamanın ana sayfasıdır ve giriş yapmayı gerektirir.
 @login_required
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
-    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih') # Düzeltildi: -tarih
+    aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
     return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
 @login_required
@@ -124,20 +124,20 @@ def raporlama_onay(request, sayim_emri_id):
     sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
     
     sayim_ozet = SayimDetay.objects.filter(sayim_emri=sayim_emri).values(
-        'malzeme__malzeme_kodu', 'malzeme__malzeme_adi', 'malzeme__parti_no', # <<< DÜZELTİLDİ
-        'malzeme__renk', 'malzeme__sistem_stogu', 'malzeme__olcu_birimi'     # <<< DÜZELTİLDİ
+        'malzeme__malzeme_kodu', 'malzeme__malzeme_adi', 'malzeme__parti_no',
+        'malzeme__renk', 'malzeme__sistem_stogu', 'malzeme__olcu_birimi'
     ).annotate(
         toplam_sayim_miktar=Sum('miktar')
-    ).order_by('malzeme__malzeme_kodu') # <<< DÜZELTİLDİ
+    ).order_by('malzeme__malzeme_kodu')
 
     rapor_verileri = []
     for ozet in sayim_ozet:
-        sistem_stok = ozet['malzeme__sistem_stogu'] or Decimal('0.00') # <<< DÜZELTİLDİ
+        sistem_stok = ozet['malzeme__sistem_stogu'] or Decimal('0.00')
         sayim_miktar = ozet['toplam_sayim_miktar'] or Decimal('0.00')
         fark = sayim_miktar - sistem_stok
         
         rapor_verileri.append({
-            'stok_kod': ozet['malzeme__malzeme_kodu'], # <<< DÜZELTİLDİ
+            'stok_kod': ozet['malzeme__malzeme_kodu'],
             'malzeme_adi': ozet['malzeme__malzeme_adi'],
             'parti_no': ozet['malzeme__parti_no'] if ozet['malzeme__parti_no'] != 'YOK' else '-',
             'renk': ozet['malzeme__renk'] if ozet['malzeme__renk'] != 'YOK' else '-',
@@ -155,12 +155,13 @@ def raporlama_onay(request, sayim_emri_id):
 
 # --- AUTH ve YÖNLENDİRME FONKSİYONLARI (Login Döngüsü Çözüldü) ---
 
+# Bu view'lar artık @login_required DEĞİLDİR
 def personel_login(request): 
     """
     Personel giriş ekranı. Kullanıcının Sayım Emri ve Depo Kodu seçmesini sağlar.
     """
     sayim_emirleri = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
-    depo_kodlari = Malzeme.objects.values_list('lokasyon_kodu', flat=True).distinct().order_by('lokasyon_kodu') # <<< Düzeltildi
+    depo_kodlari = Malzeme.objects.values_list('lokasyon_kodu', flat=True).distinct().order_by('lokasyon_kodu')
     
     context = {
         'sayim_emirleri': sayim_emirleri,
@@ -169,8 +170,10 @@ def personel_login(request):
     
     return render(request, 'sayim/personel_login.html', context)
 
+# Bu view artık @login_required DEĞİLDİR
 def yeni_sayim_emri(request):
     """Yeni sayım emri oluşturur (Fonksiyonel yer tutucu)."""
+    # NOT: Gerçek Sayım Emri oluşturma formu POST mantığı bu fonksiyona eklenmelidir.
     return render(request, 'sayim/yeni_sayim_emri.html', {})
 
 def depo_secim(request):
@@ -194,8 +197,9 @@ def set_personel_session(request):
 
 # --- YÖNETİM ARAÇLARI (Veri Yükleme için Geri Getirildi) ---
 
+# Bu view artık @login_required DEĞİLDİR (Kilitlenme Çözümü)
 def yonetim_araclari(request): 
-    """Yönetim araçları ana sayfası (Veri yüklemek için geçici olarak korumasız)."""
+    """Yönetim araçları ana sayfası."""
     return render(request, 'sayim/yonetim.html', {}) 
 
 @require_POST
@@ -264,13 +268,13 @@ def upload_and_reload_stok_data(request):
                     _, created = Malzeme.objects.update_or_create(
                         benzersiz_id=bid,
                         defaults={
-                            'malzeme_kodu': stok_kod_excel, # <<< ALAN ADI DÜZELTİLDİ
+                            'malzeme_kodu': stok_kod_excel, # ALAN ADI DÜZELTİLDİ
                             'malzeme_adi': row['Stok Adı'] or f"Stok {stok_kod_excel}",
-                            'lokasyon_kodu': lokasyon_kodu, 
+                            'lokasyon_kodu': lokasyon_kodu, # Modeldeki doğru alan adı
                             'parti_no': parti_no,
                             'renk': renk,
                             'olcu_birimi': row['Birim'],
-                            'sistem_stogu': stok_miktari, # <<< ALAN ADI DÜZELTİLDİ
+                            'sistem_stogu': stok_miktari, # ALAN ADI DÜZELTİLDİ
                             'birim_fiyat': birim_fiyati,
                             'seri_no': row['seri_no'], 
                             'barkod': row['barkod'], 
@@ -313,11 +317,11 @@ def ajax_akilli_stok_ara(request):
 
     malzeme = None
     if seri_no != 'YOK':
-        malzeme = Malzeme.objects.filter(Q(malzeme_kodu=seri_no) | Q(barkod=seri_no), lokasyon_kodu=depo_kod).first() # <<< Düzeltildi
+        malzeme = Malzeme.objects.filter(Q(malzeme_kodu=seri_no) | Q(barkod=seri_no), lokasyon_kodu=depo_kod).first() 
     
     if not malzeme and stok_kod_param != 'YOK':
         try:
-            malzeme = Malzeme.objects.get(malzeme_kodu=stok_kod_param, parti_no=parti_no_param, renk=renk_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
+            malzeme = Malzeme.objects.get(malzeme_kodu=stok_kod_param, parti_no=parti_no_param, renk=renk_param, lokasyon_kodu=depo_kod)
         except Malzeme.DoesNotExist:
              pass 
 
@@ -329,9 +333,9 @@ def ajax_akilli_stok_ara(request):
 
     if malzeme:
         data['found'] = True
-        data['urun_bilgi'] = f"{malzeme.malzeme_adi} ({malzeme.malzeme_kodu})" # <<< Düzeltildi
-        data['benzersiz_id'] = generate_unique_id(malzeme.malzeme_kodu, malzeme.parti_no, malzeme.lokasyon_kodu, malzeme.renk) # <<< Düzeltildi
-        data['sistem_stok'] = f"{malzeme.sistem_stogu:.2f}" # <<< Düzeltildi
+        data['urun_bilgi'] = f"{malzeme.malzeme_adi} ({malzeme.malzeme_kodu})" 
+        data['benzersiz_id'] = generate_unique_id(malzeme.malzeme_kodu, malzeme.parti_no, malzeme.lokasyon_kodu, malzeme.renk) 
+        data['sistem_stok'] = f"{malzeme.sistem_stogu:.2f}" 
         
         sayilan_miktar = SayimDetay.objects.filter(sayim_emri=sayim_emri, malzeme=malzeme).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
         data['sayilan_stok'] = f"{sayilan_miktar:.2f}"
@@ -340,7 +344,7 @@ def ajax_akilli_stok_ara(request):
             data['farkli_depo_uyarisi'] = f"UYARI: Ürün ({malzeme.lokasyon_kodu}) bu sayım deposu ({depo_kod}) ile eşleşmiyor!"
 
     elif stok_kod_param != 'YOK':
-        varyant_malzemeleri = Malzeme.objects.filter(malzeme_kodu=stok_kod_param, lokasyon_kodu=depo_kod) # <<< Düzeltildi
+        varyant_malzemeleri = Malzeme.objects.filter(malzeme_kodu=stok_kod_param, lokasyon_kodu=depo_kod) 
         parti_varyantlar = set(v.parti_no for v in varyant_malzemeleri if v.parti_no != 'YOK')
         renk_varyantlar = set(v.renk for v in varyant_malzemeleri if v.renk != 'YOK')
         
@@ -410,9 +414,9 @@ def ajax_sayim_kaydet(request, sayim_emri_id):
         
         toplam_sayilan_miktar = SayimDetay.objects.filter(sayim_emri=sayim_emri, malzeme=malzeme).aggregate(Sum('miktar'))['miktar__sum'] or Decimal('0.00')
 
-        mesaj = f"{malzeme.malzeme_kodu} ({malzeme.parti_no}/{malzeme.renk}) sayım kaydedildi: {miktar:.2f} {malzeme.olcu_birimi}" # <<< DÜZELTİLDİ
+        mesaj = f"{malzeme.malzeme_kodu} ({malzeme.parti_no}/{malzeme.renk}) sayım kaydedildi: {miktar:.2f} {malzeme.olcu_birimi}" 
         if malzeme_created:
-            mesaj = f"YENİ STOK OLUŞTURULDU ve sayım kaydedildi: {malzeme.malzeme_kodu}." # <<< DÜZELTİLDİ
+            mesaj = f"YENİ STOK OLUŞTURULDU ve sayım kaydedildi: {malzeme.malzeme_kodu}." 
 
         return JsonResponse({'success': True, 'message': mesaj, 'yeni_miktar': f"{toplam_sayilan_miktar:.2f}"})
 
@@ -461,7 +465,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
         for malzeme in tum_malzemeler:
             malzeme_id = malzeme.benzersiz_id
             sayilan_mik_dec = sayilan_miktarlar.get(malzeme_id, Decimal('0.0'))
-            sistem_mik_dec = malzeme.sistem_stogu or Decimal('0.0') # <<< DÜZELTİLDİ
+            sistem_mik_dec = malzeme.sistem_stogu or Decimal('0.0') # <<< Düzeltildi
             birim_fiyat_dec = malzeme.birim_fiyat or Decimal('0.0')
             
             mik_fark_dec = sayilan_mik_dec - sistem_mik_dec
@@ -469,7 +473,7 @@ def export_mutabakat_excel(request, sayim_emri_id):
             sistem_tutar_dec = sistem_mik_dec * birim_fiyat_dec
             
             rapor_data.append({
-                'Stok Kodu': malzeme.malzeme_kodu, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, # <<< DÜZELTİLDİ
+                'Stok Kodu': malzeme.malzeme_kodu, 'Stok Adı': malzeme.malzeme_adi, 'Parti No': malzeme.parti_no, 
                 'Renk': malzeme.renk, 'Depo Kodu': malzeme.lokasyon_kodu, 
                 'Sistem Miktar': sistem_mik_dec, 'Sayım Miktar': sayilan_mik_dec, 'Miktar Fark': mik_fark_dec, 
                 'Birim Fiyat': birim_fiyat_dec, 'Sistem Tutar': sistem_tutar_dec, 'Tutar Fark': tutar_fark_dec, 
