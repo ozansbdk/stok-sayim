@@ -108,7 +108,8 @@ def sayim_giris(request, sayim_emri_id):
         
     sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
     
-    depo_kodu = sayim_emri.depo_kod 
+    # *** DÜZELTİLEN KISIM: depo_kod yerine depo_kodu kullanıldı (AttributeError düzeltildi) ***
+    depo_kodu = sayim_emri.depo_kodu 
     personel_adi = request.session.get('current_user', 'MISAFIR')
     
     gemini_available = bool(os.environ.get("GEMINI_API_KEY"))
@@ -190,7 +191,7 @@ def yeni_sayim_emri(request):
             yeni_emir.tarih = timezone.now() 
             yeni_emir.save()
             
-            # **BURASI DÜZELTİLDİ:** Yeni emri kaydettikten sonra Sayım Giriş Ekranına yönlendir.
+            # **YÖNLENDİRME DÜZELTMESİ (Önceki Sorun):** Sayım Giriş Ekranına yönlendirir.
             return redirect('sayim_giris', sayim_emri_id=yeni_emir.id)
     else:
         form = SayimEmriForm() # Boş formu göster
