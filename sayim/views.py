@@ -12,7 +12,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum
 from django.views.decorators.http import require_POST, require_GET
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required # Dekorator burada kalsın, ancak bazı view'lardan kaldırıldı
 from django.conf import settings 
 from django.utils import timezone
 from django.utils.text import slugify
@@ -93,20 +93,23 @@ def create_or_update_malzeme(data):
 
 # --- WEB SAYFASI VIEW'LARI ---
 
-# Bu, uygulamanın ana sayfasıdır ve giriş yapmayı gerektirir.
-@login_required
+# Sayım Emri Listesi (Artık @login_required DEĞİL - Session üzerinden geçiş yapılıyor)
 def sayim_emri_listesi(request):
     """Ana sayfa: Aktif sayım emirlerini listeler."""
     aktif_emirler = SayimEmri.objects.filter(durum='BASLADI').order_by('-tarih')
     return render(request, 'sayim/sayim_emirleri.html', {'aktif_emirler': aktif_emirler})
 
-@login_required
+# Sayım Giriş Ekranı (Artık @login_required DEĞİL - Session üzerinden geçiş yapılıyor)
 def sayim_giris(request, sayim_emri_id):
     """Sayım Giriş Ekranı: Belirtilen sayım emri için sayım yapar."""
+    # Session kontrolünü manuel yapıyoruz
+    if 'current_user' not in request.session:
+        return redirect('personel_login') 
+        
     sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
     
     depo_kodu = sayim_emri.depo_kod 
-    personel_adi = request.user.get_full_name() or request.user.username
+    personel_adi = request.session.get('current_user', 'MISAFIR')
     
     gemini_available = bool(os.environ.get("GEMINI_API_KEY"))
     
@@ -119,9 +122,13 @@ def sayim_giris(request, sayim_emri_id):
     }
     return render(request, 'sayim/sayim_giris.html', context)
 
-@login_required
+# Raporlama ve Onay Ekranı (Artık @login_required DEĞİL - Session üzerinden geçiş yapılıyor)
 def raporlama_onay(request, sayim_emri_id):
     """Raporlama ve Onay Ekranı."""
+    # Session kontrolünü manuel yapıyoruz
+    if 'current_user' not in request.session:
+        return redirect('personel_login') 
+        
     sayim_emri = get_object_or_404(SayimEmri, id=sayim_emri_id)
     
     sayim_ozet = SayimDetay.objects.filter(sayim_emri=sayim_emri).values(
