@@ -11,10 +11,10 @@ services:
       pip install --upgrade --force-reinstall google-generativeai
       pip install -r requirements.txt
 
-    # PreRun: sistem bağımlılıkları, tesseract, statik dosyalar
+    # PreRun: sistem bağımlılıkları, tesseract, zbar, statik dosyalar
     preRunCommand: |
       apt-get update
-      apt-get install -y libpq-dev tesseract-ocr libtesseract-dev libleptonica-dev pkg-config ffmpeg
+      apt-get install -y libpq-dev tesseract-ocr libtesseract-dev libleptonica-dev pkg-config ffmpeg libzbar0
       python manage.py collectstatic --noinput
 
     # Start: migration ve gunicorn
