@@ -10,16 +10,20 @@ sqlparse==0.5.3
 pandas==2.2.3
 numpy==2.3.3
 openpyxl==3.1.5       # Yeni .xlsx dosyaları okuma/yazma
-xlsxwriter==3.2.0     # <-- EKLENDİ: pd.ExcelWriter motoru için GEREKLİ
-xlrd==2.0.1           # Eski .xls dosyalarını okumak için (Opsiyonel ama iyi olur)
+xlsxwriter==3.2.0     # Pandas ExcelWriter motoru için
+xlrd==2.0.1           # Eski .xls dosyalarını okumak için (opsiyonel)
 et_xmlfile==2.0.0
 python-dateutil==2.9.0.post0
 pytz==2025.2
 tzdata==2025.2
 
-# --- RESİM İŞLEME ve OCR ---
+# --- RESİM İŞLEME ve OCR / BARKOD ---
 Pillow==10.4.0
-pyzbar==0.1.9
+pyzbar==0.1.9               # Barkod/QR kod çözümleme
+opencv-python-headless==4.10.0.84  # Kamera & Görüntü işleme (GUI'siz sunucu için)
+pytesseract==0.3.13         # OCR motoru
+imutils==0.5.4              # Görüntü ön işleme yardımcıları
+
 
 # --- GOOGLE GEMINI (AI) ---
 google-generativeai
@@ -29,19 +33,13 @@ googleapis-common-protos>=1.56.0
 proto-plus>=1.22.0
 protobuf>=3.19.0
 
-# --- İSTEKLER VE AĞ (Çoğu bağımlılık) ---
+# --- İSTEKLER VE AĞ ---
 requests==2.32.5
 aiohttp==3.13.0
-aiohappyeyeballs==2.6.1
-aiosignal==1.4.0
-attrs==25.4.0
-frozenlist==1.8.0
-multidict==6.7.0
-yarl==1.22.0
-charset-normalizer==3.4.3
 idna==3.10
 urllib3==2.5.0
 certifi==2025.10.5
+charset-normalizer==3.4.3
 
 # --- DİĞERLERİ ---
 click==8.3.0
