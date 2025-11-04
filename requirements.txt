@@ -1,47 +1,23 @@
-# --- TEMEL DJANGO VE SUNUCU ---
 Django==5.2.7
-gunicorn
+gunicorn==23.0.0
 whitenoise==6.11.0
 dj-database-url==3.0.1
-asgiref==3.10.0
-sqlparse==0.5.3
-
-# --- VERİ İŞLEME VE EXCEL ---
 pandas==2.2.3
 numpy==2.3.3
-openpyxl==3.1.5       # Yeni .xlsx dosyaları okuma/yazma
-xlsxwriter==3.2.0     # Pandas ExcelWriter motoru için
-xlrd==2.0.1           # Eski .xls dosyalarını okumak için (opsiyonel)
+openpyxl==3.1.5
+xlsxwriter==3.2.0
+xlrd==2.0.1
 et_xmlfile==2.0.0
 python-dateutil==2.9.0.post0
 pytz==2025.2
 tzdata==2025.2
-
-# --- RESİM İŞLEME ve OCR / BARKOD ---
 Pillow==10.4.0
-pyzbar==0.1.9               # Barkod/QR kod çözümleme
-opencv-python-headless==4.10.0.84  # Kamera & Görüntü işleme (GUI'siz sunucu için)
-pytesseract==0.3.13         # OCR motoru
-imutils==0.5.4              # Görüntü ön işleme yardımcıları
-
-
-# --- GOOGLE GEMINI (AI) ---
-google-generativeai
-google-api-core>=1.31.5
-google-auth>=2.15.0
-googleapis-common-protos>=1.56.0
-proto-plus>=1.22.0
-protobuf>=3.19.0
-
-# --- İSTEKLER VE AĞ ---
+pyzbar==0.1.9
+opencv-python-headless==4.10.0.84
+pytesseract==0.3.13
+imutils==0.5.4
 requests==2.32.5
+google-generativeai==0.8.5
+google-ai-generativelanguage==0.6.15
 aiohttp==3.13.0
-idna==3.10
-urllib3==2.5.0
-certifi==2025.10.5
-charset-normalizer==3.4.3
-
-# --- DİĞERLERİ ---
-click==8.3.0
-colorama==0.4.6
 python-dotenv==1.1.1

@@ -3,15 +3,32 @@ services:
     name: Stok-1
     env: python
     pythonVersion: "3.12"
-    buildCommand: 'pip install --upgrade pip && pip cache purge && pip install --upgrade --force-reinstall google-generativeai && pip install -r requirements.txt'
-    
-    # PreRunCommand: Tesseract ve statik dosyaları toplar.
-    preRunCommand: 'apt-get update && apt-get install -y libpq-dev tesseract-ocr && python manage.py collectstatic --noinput'
-    
-    # ⭐ KRİTİK BAŞLANGIÇ KOMUTU: Migration kaydını sıfırlar ve uygular.
-    # Bu, 'atanan_personel' sütununu ekler.
-    startCommand: 'python manage.py migrate --fake sayim 0004 && python manage.py migrate && python -m gunicorn stock_project.wsgi'
-    
+
+    # Build: pip ve bağımlılıkların kurulumu
+    buildCommand: |
+      pip install --upgrade pip
+      pip cache purge
+      pip install --upgrade --force-reinstall google-generativeai
+      pip install -r requirements.txt
+
+    # PreRun: sistem bağımlılıkları, tesseract, statik dosyalar
+    preRunCommand: |
+      apt-get update
+      apt-get install -y libpq-dev tesseract-ocr libtesseract-dev libleptonica-dev pkg-config ffmpeg
+      python manage.py collectstatic --noinput
+
+    # Start: migration ve gunicorn
+    startCommand: |
+      python manage.py migrate --fake sayim 0004
+      python manage.py migrate
+      gunicorn stok_sayim.wsgi:application --bind 0.0.0.0:$PORT
+
     envVars:
       - key: PORT
         value: "10000"
+      - key: DEBUG
+        value: "False"
+      - key: DJANGO_SETTINGS_MODULE
+        value: "stok_sayim.settings"
+      - key: GOOGLE_API_KEY
+        value: "<YOUR_GOOGLE_KEY>"  # Gemini API için

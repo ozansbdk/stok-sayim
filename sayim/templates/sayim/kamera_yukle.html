@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobil Sayım Kamera Girişi</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+        video { width: 100%; max-width: 400px; border: 1px solid #ccc; border-radius: 8px; }
+        canvas { display: none; }
+        button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
+        #result { margin-top: 20px; font-weight: bold; color: green; }
+    </style>
+</head>
+<body>
+    <h2>Mobil Sayım Kamera Girişi</h2>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <br>
+    <button id="capture">Fotoğraf Çek ve Gönder</button>
+
+    <div id="result"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureBtn = document.getElementById('capture');
+        const resultDiv = document.getElementById('result');
+
+        // Kamera aç
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => video.srcObject = stream)
+            .catch(err => alert("Kamera açılamadı: " + err));
+
+        // Fotoğraf çek ve gönder
+        captureBtn.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Görüntüyü base64 string olarak al
+            const imageData = canvas.toDataURL('image/png');
+
+            // AJAX ile Django'ya gönder
+            fetch("{% url 'ajax_gemini_ocr' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ image: imageData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    resultDiv.textContent = "OCR ve analiz başarılı: " + data.text;
+                } else {
+                    resultDiv.textContent = "Hata: " + data.error;
+                }
+            })
+            .catch(err => {
+                resultDiv.textContent = "Sunucuya bağlanırken hata oluştu: " + err;
+            });
+        });
+    </script>
+</body>
+</html>
