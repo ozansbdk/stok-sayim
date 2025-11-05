@@ -22,4 +22,4 @@ COPY . .
 
 # Sunucuyu başlat
 # HATA BURADAYDI: "stok_sayim_projesi" -> "stock_project" olarak düzeltildi.
-CMD ["gunicorn", "stock_project.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "stock_project.wsgi:application", "--bind", "0.0.0.0:$PORT"]
