@@ -20,6 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Tüm proje kodunu kopyala
 COPY . .
 
-# Sunucuyu başlat (gunicorn kullandığınızı varsayıyorum)
-# "stok_sayim_projesi" yazan yeri kendi projenizin (settings.py'nin olduğu klasör) adıyla değiştirin.
-CMD ["gunicorn", "stok_sayim_projesi.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Sunucuyu başlat
+# HATA BURADAYDI: "stok_sayim_projesi" -> "stock_project" olarak düzeltildi.
+CMD ["gunicorn", "stock_project.wsgi:application", "--bind", "0.0.0.0:8000"]
